@@ -3,10 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hermes Agent</title>
+<title>Hermes Agent · Surus Enterprises</title>
+<link rel="icon" type="image/png" href="/setup/brand/surus-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet">
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <style>
   :root {
@@ -1020,28 +1021,30 @@
     #toast { left: 16px; right: 16px; bottom: 16px; max-width: none; }
   }
 </style>
+<!-- Surus Enterprises brand layer: overrides the styles above. -->
+<link rel="stylesheet" href="/setup/brand/surus.css">
 </head>
 <body x-data="app()" x-init="init()" x-cloak>
 
 <!-- Header -->
 <div id="header">
-  <button class="menu-toggle" @click="menuOpen = !menuOpen" aria-label="Toggle navigation menu">☰</button>
-  <img src="https://pbs.twimg.com/profile_images/1816254738234761216/TX7TW-Mp_400x400.jpg"
-       alt="Hermes" style="width:28px;height:28px;border-radius:6px;flex-shrink:0;">
-  <div class="logo">hermes<span>/admin</span></div>
-  <!-- A paused bot keeps its gateway "running", so the plain state would read
-       green while every message is refused. Paused wins the header readout. -->
-  <div class="status-dot" :class="paused ? 'error' : (gw.state||'stopped')"></div>
-  <div id="status-label" x-text="paused ? 'paused' : (gw.state||'stopped')"></div>
-  <div class="header-spacer"></div>
-  <div class="header-branding">
-    <span>made with ♥ by</span>
-    <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/heimdall-light.svg" alt="Heimdall">
-    <a href="https://github.com/praveen-ks-2001" target="_blank" rel="noopener">Heimdall</a>
+  <div class="brand-cell">
+    <button class="menu-toggle" @click="menuOpen = !menuOpen" aria-label="Toggle navigation menu"><span class="ico i-menu"></span></button>
+    <a class="surus-lockup" href="/setup" aria-label="Surus Enterprises">
+      <img src="/setup/brand/surus-icon-white.png" alt="">
+      <span class="surus-wordmark"><span>Surus</span><span>Enterprises</span></span>
+    </a>
   </div>
-  <div class="header-spacer"></div>
-  <a class="header-issue-link" href="https://github.com/praveen-ks-2001/hermes-agent-template/issues" target="_blank" rel="noopener">⚠ Report issue</a>
-  <button class="header-btn" @click="restartGateway()">↺ Restart</button>
+  <div class="header-main">
+    <div class="header-product"><span>Hermes Agent</span><span class="sep">/</span><span class="cur">Admin</span></div>
+    <!-- A paused bot keeps its gateway "running", so the plain state would read
+         green while every message is refused. Paused wins the header readout. -->
+    <div class="status-dot" :class="paused ? 'error' : (gw.state||'stopped')"></div>
+    <div id="status-label" x-text="paused ? 'paused' : (gw.state||'stopped')"></div>
+    <div class="header-spacer"></div>
+    <a class="header-issue-link" href="https://github.com/praveen-ks-2001/hermes-agent-template/issues" target="_blank" rel="noopener"><span class="ico i-triangle-alert"></span>Report issue</a>
+    <button class="header-btn" @click="restartGateway()"><span class="ico i-rotate-cw"></span>Restart</button>
+  </div>
 </div>
 
 <!-- Layout -->
@@ -1055,7 +1058,7 @@
 
     <div class="nav-group-label">Setup</div>
     <div class="nav-item" :class="{active: page==='setup'}" @click="page='setup'">
-      <span class="nav-icon">⚡</span>
+      <span class="nav-icon ico i-settings"></span>
       <span>Setup</span>
     </div>
 
@@ -1063,22 +1066,22 @@
     <div class="nav-item highlight"
          @click="window.location.href='/?force=1'"
          title="Open the native Hermes dashboard — providers, skills, analytics, sessions">
-      <span class="nav-icon">⬢</span>
+      <span class="nav-icon ico i-layout-dashboard"></span>
       <span>Hermes Dashboard</span>
-      <span class="nav-arrow">→</span>
+      <span class="nav-arrow ico i-arrow-right"></span>
     </div>
 
     <div class="nav-group-label" style="margin-top:8px">Monitor</div>
     <div class="nav-item"
          :class="{active: page==='status', locked: !isSetupDone}"
          @click="isSetupDone && (page='status')">
-      <span class="nav-icon">◎</span>
+      <span class="nav-icon ico i-activity"></span>
       <span>Status</span>
     </div>
     <div class="nav-item"
          :class="{active: page==='logs', locked: !isSetupDone}"
          @click="isSetupDone && (page='logs')">
-      <span class="nav-icon">≡</span>
+      <span class="nav-icon ico i-list"></span>
       <span>Logs</span>
     </div>
 
@@ -1086,28 +1089,28 @@
     <div class="nav-item"
          :class="{active: page==='users', locked: !isSetupDone}"
          @click="isSetupDone && (page='users')">
-      <span class="nav-icon">◈</span>
+      <span class="nav-icon ico i-users"></span>
       <span>Users</span>
       <span class="nav-badge" :class="{visible: pendingCount>0}" x-text="pendingCount"></span>
     </div>
 
     <div class="nav-group-label" style="margin-top:8px">Resources</div>
     <div class="nav-item" :class="{active: page==='guide'}" @click="page='guide'">
-      <span class="nav-icon">📖</span>
+      <span class="nav-icon ico i-book-open"></span>
       <span>How to Setup</span>
     </div>
     <div class="nav-item" :class="{active: page==='templates'}" @click="page='templates'">
-      <span class="nav-icon">🚀</span>
+      <span class="nav-icon ico i-grid-2x2"></span>
       <span>Other Templates</span>
     </div>
     <div class="nav-item" :class="{active: page==='changelog'}" @click="page='changelog'">
-      <span class="nav-icon">🆕</span>
+      <span class="nav-icon ico i-history"></span>
       <span>What's New</span>
     </div>
 
     <div class="nav-group-label" style="margin-top:8px">Data</div>
     <div class="nav-item" :class="{active: page==='backup'}" @click="page='backup'">
-      <span class="nav-icon">⇅</span>
+      <span class="nav-icon ico i-database"></span>
       <span>Backup &amp; Restore</span>
     </div>
 
@@ -1129,14 +1132,16 @@
     <div class="nav-divider"></div>
 
     <div class="nav-item danger" @click="resetConfig()">
-      <span class="nav-icon">⊘</span>
+      <span class="nav-icon ico i-rotate-ccw"></span>
       <span>Reset Config</span>
     </div>
 
     <div class="nav-item" @click="window.location.href='/logout'">
-      <span class="nav-icon">↪</span>
+      <span class="nav-icon ico i-log-out"></span>
       <span>Sign out</span>
     </div>
+
+    <div class="sidebar-credit">Built on the Hermes Agent template by <a href="https://github.com/praveen-ks-2001" target="_blank" rel="noopener">Heimdall</a></div>
 
   </nav>
 
@@ -1173,7 +1178,7 @@
           <p>In <a href="/?force=1">Hermes Dashboard</a> &rarr; Channels &rarr; Email, set <strong>Receiving MTA authserv-id</strong> to the exact value in your receiving server’s topmost Authentication-Results header. Profiles: <span x-text="(status.email_authserv_missing || []).join(', ')"></span>. Until configured, authenticated incoming mail is rejected even if the account connects. After saving, test with a new email.</p>
         </div>
 
-        <div style="background:rgba(98,114,255,0.06);border:1px solid rgba(98,114,255,0.2);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--text-dim);">
+        <div style="background:var(--blue-50);border:1px solid var(--data-dem-soft);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--text-dim);">
           New to Hermes? Head over to the <a href="#" @click.prevent="page='guide'" style="color:var(--accent2);text-decoration:none;font-weight:500;">How to Setup</a> section for a step-by-step guide on getting started.
         </div>
 
@@ -1345,8 +1350,8 @@
         </div>
 
         <!-- xAI Grok SuperGrok OAuth — shown when xAI provider is selected -->
-        <div class="card" x-show="selectedProvider === 'xAI Grok (SuperGrok)'" style="border-left:3px solid #6272ff;padding:14px 16px;">
-          <p style="margin:0 0 10px;font-size:13px;font-weight:600;color:#c9d1d9;">xAI Grok — SuperGrok OAuth</p>
+        <div class="card" x-show="selectedProvider === 'xAI Grok (SuperGrok)'" style="border-top:3px solid var(--accent);padding:14px 16px;">
+          <p style="margin:0 0 10px;font-size:13px;font-weight:600;color:var(--text);">xAI Grok — SuperGrok OAuth</p>
 
           <!-- not yet started -->
           <template x-if="xai.status === 'none'">
@@ -1368,9 +1373,9 @@
                  style="display:block;color:var(--accent2);font-size:12px;word-break:break-all;margin-bottom:10px;"
                  x-text="xai.verificationUri"></a>
               <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:14px;text-align:center;margin-bottom:10px;">
-                <span style="font-family:var(--font-mono);font-size:26px;letter-spacing:5px;color:#c9d1d9;" x-text="xai.userCode"></span>
+                <span style="font-family:var(--font-mono);font-size:26px;letter-spacing:5px;color:var(--text);" x-text="xai.userCode"></span>
               </div>
-              <p class="hint" style="text-align:center;margin:0;">⏳ Waiting for authorisation…</p>
+              <p class="hint" style="text-align:center;margin:0;"><span class="ico i-hourglass"></span> Waiting for authorisation…</p>
             </div>
           </template>
 
@@ -1405,29 +1410,29 @@
                   <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;">
                     <div style="display:flex;flex-direction:column;gap:3px;min-width:0;">
                       <div style="display:flex;align-items:center;gap:8px;">
-                        <span style="font-size:13px;color:#c9d1d9;" x-text="cp.name"></span>
+                        <span style="font-size:13px;color:var(--text);" x-text="cp.name"></span>
                         <span x-show="cp.isOauth"
-                              style="font-size:10px;font-family:var(--font-mono);background:rgba(98,114,255,.15);color:var(--accent2);padding:2px 6px;border-radius:4px;">
+                              style="font-size:10px;font-family:var(--font-mono);background:var(--red-50);color:var(--red-700);border:1px solid var(--red-200);padding:2px 6px;border-radius:4px;">
                           OAuth
                         </span>
                         <span x-show="!cp.isOauth && !cp.isCustom && !cp.isBedrock && !cp.isAzure && !cp.isRouter"
-                              style="font-size:10px;font-family:var(--font-mono);background:rgba(63,185,80,.12);color:var(--green);padding:2px 6px;border-radius:4px;">
+                              style="font-size:10px;font-family:var(--font-mono);background:var(--green-50);color:var(--green);border:1px solid var(--green-border);padding:2px 6px;border-radius:4px;">
                           API key set
                         </span>
                         <span x-show="cp.isRouter"
-                              style="font-size:10px;font-family:var(--font-mono);background:rgba(88,166,255,.12);color:var(--accent2);padding:2px 6px;border-radius:4px;">
+                              style="font-size:10px;font-family:var(--font-mono);background:var(--blue-50);color:var(--blue-500);border:1px solid var(--data-dem-soft);padding:2px 6px;border-radius:4px;">
                           Router
                         </span>
                         <span x-show="cp.isBedrock"
-                              style="font-size:10px;font-family:var(--font-mono);background:rgba(255,153,0,.15);color:#f90;padding:2px 6px;border-radius:4px;">
+                              style="font-size:10px;font-family:var(--font-mono);background:var(--amber-50);color:var(--amber-text);border:1px solid var(--amber-border);padding:2px 6px;border-radius:4px;">
                           AWS
                         </span>
                         <span x-show="cp.isAzure"
-                              style="font-size:10px;font-family:var(--font-mono);background:rgba(0,120,212,.15);color:#0078d4;padding:2px 6px;border-radius:4px;">
+                              style="font-size:10px;font-family:var(--font-mono);background:var(--blue-50);color:var(--blue-500);border:1px solid var(--data-dem-soft);padding:2px 6px;border-radius:4px;">
                           Azure
                         </span>
                         <span x-show="cp.isCustom"
-                              style="font-size:10px;font-family:var(--font-mono);background:rgba(210,153,34,.12);color:var(--yellow);padding:2px 6px;border-radius:4px;">
+                              style="font-size:10px;font-family:var(--font-mono);background:var(--amber-50);color:var(--yellow);border:1px solid var(--amber-border);padding:2px 6px;border-radius:4px;">
                           Custom
                         </span>
                       </div>
@@ -1453,7 +1458,7 @@
           <!-- Telegram -->
           <div class="toggle-row" @click="channelsEnabled.telegram=!channelsEnabled.telegram; if(!channelsEnabled.telegram) clearChannel('telegram')">
             <input type="checkbox" :checked="channelsEnabled.telegram" @click.stop @change="channelsEnabled.telegram=$event.target.checked; if(!channelsEnabled.telegram) clearChannel('telegram')">
-            <span class="toggle-icon">✈️</span>
+            <span class="toggle-icon ico i-send"></span>
             <span class="toggle-label">Telegram</span>
           </div>
           <div class="toggle-body" x-show="channelsEnabled.telegram">
@@ -1466,7 +1471,7 @@
           <!-- Discord -->
           <div class="toggle-row" @click="channelsEnabled.discord=!channelsEnabled.discord; if(!channelsEnabled.discord) clearChannel('discord')">
             <input type="checkbox" :checked="channelsEnabled.discord" @click.stop @change="channelsEnabled.discord=$event.target.checked; if(!channelsEnabled.discord) clearChannel('discord')">
-            <span class="toggle-icon">🎮</span>
+            <span class="toggle-icon ico i-gamepad-2"></span>
             <span class="toggle-label">Discord</span>
           </div>
           <div class="toggle-body" x-show="channelsEnabled.discord">
@@ -1479,7 +1484,7 @@
           <!-- Slack -->
           <div class="toggle-row" @click="channelsEnabled.slack=!channelsEnabled.slack; if(!channelsEnabled.slack) clearChannel('slack')">
             <input type="checkbox" :checked="channelsEnabled.slack" @click.stop @change="channelsEnabled.slack=$event.target.checked; if(!channelsEnabled.slack) clearChannel('slack')">
-            <span class="toggle-icon">💼</span>
+            <span class="toggle-icon ico i-hash"></span>
             <span class="toggle-label">Slack</span>
           </div>
           <div class="toggle-body" x-show="channelsEnabled.slack">
@@ -1492,7 +1497,7 @@
           <!-- Email -->
           <div class="toggle-row" @click="channelsEnabled.email=!channelsEnabled.email; if(!channelsEnabled.email) clearChannel('email')">
             <input type="checkbox" :checked="channelsEnabled.email" @click.stop @change="channelsEnabled.email=$event.target.checked; if(!channelsEnabled.email) clearChannel('email')">
-            <span class="toggle-icon">📧</span>
+            <span class="toggle-icon ico i-mail"></span>
             <span class="toggle-label">Email</span>
           </div>
           <div class="toggle-body" x-show="channelsEnabled.email">
@@ -1507,7 +1512,7 @@
           <!-- Mattermost -->
           <div class="toggle-row" @click="channelsEnabled.mattermost=!channelsEnabled.mattermost; if(!channelsEnabled.mattermost) clearChannel('mattermost')">
             <input type="checkbox" :checked="channelsEnabled.mattermost" @click.stop @change="channelsEnabled.mattermost=$event.target.checked; if(!channelsEnabled.mattermost) clearChannel('mattermost')">
-            <span class="toggle-icon">🔷</span>
+            <span class="toggle-icon ico i-messages-square"></span>
             <span class="toggle-label">Mattermost</span>
           </div>
           <div class="toggle-body" x-show="channelsEnabled.mattermost">
@@ -1520,7 +1525,7 @@
           <!-- Matrix -->
           <div class="toggle-row" @click="channelsEnabled.matrix=!channelsEnabled.matrix; if(!channelsEnabled.matrix) clearChannel('matrix')">
             <input type="checkbox" :checked="channelsEnabled.matrix" @click.stop @change="channelsEnabled.matrix=$event.target.checked; if(!channelsEnabled.matrix) clearChannel('matrix')">
-            <span class="toggle-icon">🔢</span>
+            <span class="toggle-icon ico i-grid-3x3"></span>
             <span class="toggle-label">Matrix</span>
           </div>
           <div class="toggle-body" x-show="channelsEnabled.matrix">
@@ -1534,7 +1539,7 @@
           <!-- WhatsApp -->
           <div class="toggle-row" style="border-bottom:none;" @click="channelsEnabled.whatsapp=!channelsEnabled.whatsapp; vars.WHATSAPP_ENABLED=channelsEnabled.whatsapp?'true':'false'">
             <input type="checkbox" :checked="channelsEnabled.whatsapp" @click.stop @change="channelsEnabled.whatsapp=$event.target.checked; vars.WHATSAPP_ENABLED=$event.target.checked?'true':'false'">
-            <span class="toggle-icon">💬</span>
+            <span class="toggle-icon ico i-message-circle"></span>
             <span class="toggle-label">WhatsApp</span>
             <span style="font-size:11px;color:var(--text-dim);margin-left:8px;">pairing via gateway logs on first run</span>
           </div>
@@ -1613,8 +1618,8 @@
              says so explicitly rather than leaving "try redeploying" implied. -->
         <div x-show="paused"
              style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 14px;margin-bottom:16px;
-                    background:rgba(248,81,73,0.09);border:1px solid rgba(248,81,73,0.35);border-radius:8px;">
-          <span style="font-size:18px;line-height:1;">⏸️</span>
+                    background:var(--danger-50);border:1px solid var(--danger-border);border-radius:8px;">
+          <span class="ico i-circle-pause" style="width:20px;height:20px;color:var(--red);"></span>
           <div style="flex:1;min-width:220px;">
             <div style="color:var(--red);font-weight:600;font-size:13px;">Bot is paused — it is refusing every message</div>
             <div style="color:var(--text-dim);font-size:12px;margin-top:3px;">
@@ -1625,7 +1630,7 @@
               <span x-show="paused && paused.engaged_at" x-text="' Since: ' + (paused && paused.engaged_at)"></span>
             </div>
           </div>
-          <button class="btn success" @click="resumeBot()">▶ Resume</button>
+          <button class="btn success" @click="resumeBot()"><span class="ico i-play"></span>Resume</button>
         </div>
 
         <div class="stat-card" style="margin-bottom:16px;padding:12px 14px;">
@@ -1668,9 +1673,9 @@
         </div>
 
         <div class="action-row">
-          <button class="btn success" @click="startGw()"        :disabled="gw.state==='running'">▶ Start</button>
-          <button class="btn danger"  @click="stopGw()"         :disabled="gw.state==='stopped'">■ Stop</button>
-          <button class="btn"         @click="restartGateway()">↺ Restart</button>
+          <button class="btn success" @click="startGw()"        :disabled="gw.state==='running'"><span class="ico i-play"></span>Start</button>
+          <button class="btn danger"  @click="stopGw()"         :disabled="gw.state==='stopped'"><span class="ico i-square"></span>Stop</button>
+          <button class="btn"         @click="restartGateway()"><span class="ico i-rotate-cw"></span>Restart</button>
           <button class="btn"         @click="applyDependencies()">Apply dependencies</button>
         </div>
         <p class="hint">Apply dependencies restarts the Hermes dashboard and a running gateway after a plugin asks for a restart. A stopped gateway stays stopped; paused bots stay paused. Open chats briefly reconnect.</p>
@@ -1869,7 +1874,7 @@
             <input type="file" accept=".zip,application/zip" x-ref="restoreInput"
                    @change="setRestoreFile($event.target.files[0])"
                    class="dropzone-input">
-            <div class="dropzone-icon">⬆</div>
+            <div class="dropzone-icon"><span class="ico i-upload"></span></div>
             <div class="dropzone-main">
               <span x-show="!restoreFile">Drop a backup .zip here, or <span class="dropzone-link">browse</span></span>
               <span x-show="restoreFile" class="dropzone-file" x-text="restoreFile ? restoreFile.name : ''"></span>
@@ -1879,7 +1884,7 @@
           </label>
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;">
             <button class="btn danger" @click="restoreBackup()" :disabled="restoreBusy || !restoreFile">
-              <span x-show="!restoreBusy">⬆ Upload &amp; Restore</span>
+              <span x-show="!restoreBusy"><span class="ico i-upload"></span> Upload &amp; Restore</span>
               <span x-show="restoreBusy">Restoring…</span>
             </button>
             <button class="btn" type="button" x-show="restoreFile" @click="clearRestoreFile()">Clear</button>
@@ -2008,7 +2013,7 @@
       </div>
       <div class="panel-body">
 
-        <div style="background:rgba(98,114,255,0.06);border:1px solid rgba(98,114,255,0.2);border-radius:8px;padding:12px 15px;margin-bottom:20px;font-size:13px;color:var(--text-dim);line-height:1.6;">
+        <div style="background:var(--blue-50);border:1px solid var(--data-dem-soft);border-radius:8px;padding:12px 15px;margin-bottom:20px;font-size:13px;color:var(--text-dim);line-height:1.6;">
           <div style="margin-bottom:8px;">
             <code>main</code> always ships the <strong style="color:var(--text);">latest</strong> release — that is what you get by default.
             To stay on a particular Hermes version, point your Railway service at that release's branch and redeploy.
