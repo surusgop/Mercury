@@ -1,0 +1,493 @@
+/* Surus Enterprises brand layer for the Hermes admin.
+   Values come from the Surus Design System (tokens.json). This sheet loads
+   after the template's inline <style>, so it wins at equal specificity and the
+   upstream CSS can stay untouched (keeps upstream merges clean). */
+
+:root {
+  /* ── Surus tokens (subset used here) ── */
+  --red-50:#FDF3F3; --red-100:#F8E2E3; --red-200:#EFC2C4; --red-300:#E2969A; --red-400:#D25E64;
+  --red-500:#C3262F; --red-600:#A81F27; --red-700:#8A181F;
+  --gray-0:#FFFFFF; --gray-25:#FAFBFC; --gray-50:#F5F7F9; --gray-100:#EDF0F3; --gray-200:#DFE4E9;
+  --gray-300:#C3CAD3; --gray-400:#98A2AF; --gray-500:#6B7684; --gray-600:#4C5663; --gray-700:#333B46;
+  --gray-800:#232932; --gray-900:#171B21; --gray-950:#0F1216;
+  --green-50:#EAF5EF; --green-500:#1E7A4C; --green-border:#BFE0CD;
+  --amber-50:#FBF3E5; --amber-500:#B8791A; --amber-text:#8A5A12; --amber-border:#EBD5AA;
+  --blue-50:#EAF1F8; --blue-500:#2660A4; --data-dem-soft:#C3D5E8;
+  --danger-50:#FBECEB; --danger-500:#B3261E; --danger-border:#EFC2C4;
+
+  --text-strong:var(--gray-950);
+  --text-body:var(--gray-800);
+  --text-muted:var(--gray-500);
+  --border-subtle:var(--gray-200);
+  --border-default:var(--gray-300);
+  --border-strong:var(--gray-400);
+  --border-inverse:rgba(255,255,255,.16);
+  --focus-ring:rgba(195,38,47,.35);
+  --shadow-focus:0 0 0 3px var(--focus-ring);
+  --overlay-scrim:rgba(15,18,22,.55);
+
+  --shadow-xs:0 1px 1px rgba(15,18,22,.04);
+  --shadow-sm:0 1px 2px rgba(15,18,22,.06),0 1px 1px rgba(15,18,22,.04);
+  --shadow-md:0 2px 4px rgba(15,18,22,.06),0 4px 12px rgba(15,18,22,.06);
+  --shadow-lg:0 8px 24px rgba(15,18,22,.10),0 2px 6px rgba(15,18,22,.06);
+  --shadow-inset-top:inset 0 1px 0 rgba(255,255,255,.10);
+  --shadow-press:inset 0 1px 2px rgba(15,18,22,.14);
+
+  --radius-badge:4px; --radius-control:6px; --radius-card:8px;
+
+  --font-display:"Montserrat","Helvetica Neue",Arial,sans-serif;
+  --font-wordmark:"Montserrat",Arial,sans-serif;
+  --font-sans:"IBM Plex Sans","Helvetica Neue",Arial,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+
+  --ease-standard:cubic-bezier(.2,.6,.2,1);
+  --transition-control:background-color 120ms var(--ease-standard),border-color 120ms var(--ease-standard),color 120ms var(--ease-standard),box-shadow 120ms var(--ease-standard);
+
+  /* ── The template's own variables, remapped onto Surus semantics ── */
+  --bg:var(--gray-50);          /* surface-page */
+  --surface:var(--gray-0);      /* surface-card */
+  --surface2:var(--gray-50);    /* hover rows, wells */
+  --border:var(--border-subtle);
+  --text:var(--text-body);
+  --text-dim:var(--text-muted);
+  --accent:var(--red-500);
+  --accent2:var(--red-600);     /* link text and hover */
+  --green:var(--green-500);
+  --yellow:var(--amber-text);   /* warning text that passes 4.5:1 on white */
+  --red:var(--danger-500);
+  --sidebar-w:248px;
+  --header-h:56px;
+}
+
+body {
+  font:400 15px/1.55 var(--font-sans);
+  color:var(--text-body);
+  background:var(--bg);
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ── Icons: Lucide via CSS mask (the design system's documented icon set) ── */
+.ico {
+  display:inline-block; width:15px; height:15px; flex:0 0 auto;
+  background:currentColor; vertical-align:-2px;
+  -webkit-mask:var(--ico) center/contain no-repeat; mask:var(--ico) center/contain no-repeat;
+}
+.i-menu{--ico:url("https://unpkg.com/lucide-static@0.414.0/icons/menu.svg")}
+.i-settings{--ico:url("https://unpkg.com/lucide-static@0.414.0/icons/settings.svg")}
+.i-layout-dashboard{--ico:url("https://unpkg.com/lucide-static@0.414.0/icons/layout-dashboard.svg")}
+.i-arrow-right{--ico:url("https://unpkg.com/lucide-static@0.414.0/icons/arrow-right.svg")}
+.i-activity{--ico:url("https://unpkg.com/lucide-static@0.414.0/icons/activity.svg")}
+.i-list{--ico:url("https://unpkg.com/lucide-static@0.414.0/icons/list.svg")}
+.i-users{--ico:url("https://unpkg.com/lucide-static@0.414.0/icons/users.svg")}
+.i-book-open{--ico:url("https://unpkg.com/lucide-static@0.414.0/icons/book-open.svg")}
+.i-grid-2x2{--ico:url("https://unpkg.com/lucide-static@0.414.0/icons/grid-2x2.svg")}
+.i-history{--ico:url("https://unpkg.com/lucide-static@0.414.0/icons/history.svg")}
+.i-database{--ico:url("https://unpkg.com/lucide-static@0.414.0/icons/database.svg")}
+.i-rotate-cw{--ico:url("https://unpkg.com/lucide-static@0.414.0/icons/rotate-cw.svg")}
+.i-rotate-ccw{--ico:url("https://unpkg.com/lucide-static@0.414.0/icons/rotate-ccw.svg")}
+.i-log-out{--ico:url("https://unpkg.com/lucide-static@0.414.0/icons/log-out.svg")}
+.i-triangle-alert{--ico:url("https://unpkg.com/lucide-static@0.414.0/icons/triangle-alert.svg")}
+.i-send{--ico:url("https://unpkg.com/lucide-static@0.414.0/icons/send.svg")}
+.i-gamepad-2{--ico:url("https://unpkg.com/lucide-static@0.414.0/icons/gamepad-2.svg")}
+.i-hash{--ico:url("https://unpkg.com/lucide-static@0.414.0/icons/hash.svg")}
+.i-mail{--ico:url("https://unpkg.com/lucide-static@0.414.0/icons/mail.svg")}
+.i-messages-square{--ico:url("https://unpkg.com/lucide-static@0.414.0/icons/messages-square.svg")}
+.i-grid-3x3{--ico:url("https://unpkg.com/lucide-static@0.414.0/icons/grid-3x3.svg")}
+.i-message-circle{--ico:url("https://unpkg.com/lucide-static@0.414.0/icons/message-circle.svg")}
+.i-circle-pause{--ico:url("https://unpkg.com/lucide-static@0.414.0/icons/circle-pause.svg")}
+.i-hourglass{--ico:url("https://unpkg.com/lucide-static@0.414.0/icons/hourglass.svg")}
+.i-play{--ico:url("https://unpkg.com/lucide-static@0.414.0/icons/play.svg")}
+.i-square{--ico:url("https://unpkg.com/lucide-static@0.414.0/icons/square.svg")}
+.i-upload{--ico:url("https://unpkg.com/lucide-static@0.414.0/icons/upload.svg")}
+
+/* ── Header: an ink brand cell over the sidebar, white bar to its right ── */
+#header {
+  background:var(--surface);
+  border-bottom:0;
+  padding:0;
+  gap:0;
+  align-items:stretch;
+}
+.brand-cell {
+  width:var(--sidebar-w);
+  flex-shrink:0;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:0 16px;
+  background:var(--gray-950);
+}
+.surus-lockup {
+  display:inline-flex; align-items:center; gap:12px;
+  text-decoration:none; border:0;
+}
+.surus-lockup img { height:30px; width:auto; display:block; }
+.surus-wordmark { display:grid; gap:1px; line-height:1; color:#fff; white-space:nowrap; }
+.surus-wordmark span:first-child {
+  font:900 16.2px/1 var(--font-wordmark); letter-spacing:.02em; text-transform:uppercase;
+}
+.surus-wordmark span:last-child {
+  font:700 6.5px/1 var(--font-wordmark); letter-spacing:.89px; text-transform:uppercase; opacity:.85;
+}
+.header-main {
+  flex:1; min-width:0;
+  display:flex; align-items:center; gap:12px;
+  padding:0 24px;
+  border-bottom:1px solid var(--border-subtle);
+}
+.header-product {
+  display:flex; align-items:center; gap:6px;
+  font:500 12px/1 var(--font-sans); color:var(--text-muted); white-space:nowrap;
+}
+.header-product .sep { color:var(--gray-300); }
+.header-product .cur { color:var(--text-body); }
+
+.status-dot.running { background:var(--green-500); box-shadow:none; }
+.status-dot.starting,
+.status-dot.stopping { background:var(--amber-500); }
+.status-dot.error,
+.status-dot.crashed { background:var(--danger-500); }
+.status-dot.stopped { background:var(--gray-400); }
+#status-label { font:500 12px/1 var(--font-sans); color:var(--text-muted); }
+
+.header-btn,
+.header-issue-link {
+  display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  height:28px; padding:0 12px;
+  font:600 11px/1 var(--font-sans); letter-spacing:.06em; text-transform:uppercase;
+  border-radius:var(--radius-control); border:1px solid var(--border-default);
+  background:var(--gray-0); color:var(--gray-800); box-shadow:var(--shadow-xs);
+  text-decoration:none; transition:var(--transition-control);
+}
+.header-btn:hover,
+.header-issue-link:hover { background:var(--gray-50); border-color:var(--border-strong); color:var(--gray-900); }
+.header-issue-link { border-color:transparent; background:transparent; box-shadow:none; color:var(--gray-700); }
+.header-issue-link:hover { background:var(--gray-100); border-color:transparent; }
+.header-btn .ico,
+.header-issue-link .ico { width:13px; height:13px; }
+
+.menu-toggle {
+  background:transparent; border:1px solid var(--border-inverse); color:#fff;
+  border-radius:var(--radius-control);
+}
+.menu-toggle:hover { background:rgba(255,255,255,.07); border-color:var(--border-inverse); color:#fff; }
+.menu-toggle .ico { width:16px; height:16px; }
+
+/* ── Sidebar: the one ink surface ── */
+#sidebar {
+  background:var(--gray-950);
+  border-right:0;
+  padding:4px 8px 12px;
+  color:var(--gray-300);
+}
+.nav-group-label {
+  font:700 11px/1.35 var(--font-sans); letter-spacing:.14em; text-transform:uppercase;
+  color:var(--gray-400);
+  padding:8px 12px 4px;
+}
+.nav-item {
+  gap:12px;
+  min-height:36px;
+  padding:0 12px;
+  margin:1px 0;
+  border-left:0;
+  border-radius:var(--radius-control);
+  color:var(--gray-300);
+  font:500 13px/1 var(--font-sans);
+  transition:var(--transition-control);
+}
+.nav-item:hover { color:#fff; background:rgba(255,255,255,.07); }
+.nav-item.active { color:#fff; background:var(--red-500); font-weight:600; }
+.nav-item.locked { opacity:.45; }
+.nav-item.danger { color:var(--red-400); }
+.nav-item.danger:hover { color:var(--red-300); background:rgba(255,255,255,.07); }
+.nav-icon.ico { width:15px; height:15px; }
+
+/* Hermes Dashboard link-out: an inverse button, so it never reads as the active row */
+.nav-item.highlight {
+  color:var(--gray-950);
+  background:#fff;
+  font-weight:600;
+  margin:4px 0;
+  padding:0 12px;
+  border-radius:var(--radius-control);
+  box-shadow:none;
+  transition:var(--transition-control);
+}
+.nav-item.highlight:hover { background:var(--gray-100); transform:none; box-shadow:none; color:var(--gray-950); }
+.nav-item.highlight .nav-icon,
+.nav-item.highlight .nav-arrow { color:inherit; }
+.nav-item.highlight .nav-arrow { margin-left:auto; width:14px; height:14px; transition:none; }
+.nav-item.highlight:hover .nav-arrow { transform:none; }
+
+.nav-badge {
+  right:12px;
+  background:var(--red-500); color:#fff;
+  font:600 11px/1 var(--font-mono);
+  padding:3px 6px; border-radius:var(--radius-badge);
+}
+.nav-badge.visible { animation:none; }
+.nav-item.active .nav-badge { background:#fff; color:var(--red-600); }
+.nav-divider { background:var(--border-inverse); margin:8px 12px; }
+
+.version-badge {
+  margin:0 4px 8px;
+  border:1px solid var(--border-inverse);
+  border-radius:var(--radius-control);
+  background:transparent;
+}
+.version-badge:hover { border-color:var(--gray-500); }
+.version-badge-label { font:700 11px/1.35 var(--font-sans); letter-spacing:.14em; color:var(--gray-400); }
+.version-badge-value { font:500 12px/1.35 var(--font-mono); color:#fff; }
+.version-badge-hint { font-size:11px; color:var(--gray-400); }
+.version-badge:hover .version-badge-hint { color:#fff; }
+
+.sidebar-credit {
+  padding:12px 12px 0;
+  margin-top:8px;
+  border-top:1px solid var(--border-inverse);
+  font:400 11px/1.4 var(--font-sans);
+  color:var(--gray-400);
+}
+.sidebar-credit a { color:var(--gray-300); text-decoration:none; }
+.sidebar-credit a:hover { color:#fff; }
+
+/* ── Panels ── */
+.panel-header {
+  background:var(--surface);
+  padding:16px 24px;
+  border-bottom:1px solid var(--border-subtle);
+}
+.panel-title {
+  font:800 21px/1.18 var(--font-display);
+  letter-spacing:-.01em;
+  color:var(--text-strong);
+}
+.panel-subtitle { font:400 13px/1.4 var(--font-sans); color:var(--text-muted); }
+.panel-body { padding:24px; }
+
+/* ── Buttons (Surus Button: uppercase label, 6px radius, hover darkens) ── */
+.btn {
+  display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  min-height:36px; padding:0 20px;
+  font:600 12px/1 var(--font-sans); letter-spacing:.06em; text-transform:uppercase;
+  border-radius:var(--radius-control);
+  border:1px solid var(--border-default);
+  background:var(--gray-0); color:var(--gray-800);
+  box-shadow:var(--shadow-xs);
+  transition:var(--transition-control);
+  white-space:nowrap; text-decoration:none;
+}
+.btn:hover { background:var(--gray-50); border-color:var(--border-strong); color:var(--gray-900); }
+.btn:active:not(:disabled) { transform:translateY(1px); box-shadow:var(--shadow-press); }
+.btn:disabled { opacity:.45; cursor:not-allowed; box-shadow:none; }
+.btn.primary { background:var(--red-500); border-color:var(--red-600); color:#fff; box-shadow:var(--shadow-inset-top); }
+.btn.primary:hover { background:var(--red-600); border-color:var(--red-700); color:#fff; }
+.btn.danger { color:var(--danger-500); }
+.btn.danger:hover { background:var(--danger-50); border-color:var(--danger-500); color:var(--danger-500); }
+.btn.success { color:var(--green-500); }
+.btn.success:hover { background:var(--green-50); border-color:var(--green-500); color:var(--green-500); }
+.btn.sm { min-height:28px; padding:0 12px; font-size:11px; }
+.btn .ico { width:14px; height:14px; }
+.btn.sm .ico { width:13px; height:13px; }
+
+.btn:focus-visible,
+.header-btn:focus-visible,
+.header-issue-link:focus-visible,
+.menu-toggle:focus-visible,
+.nav-item:focus-visible { outline:none; box-shadow:var(--shadow-focus); }
+
+/* ── Forms ── */
+.field-label {
+  font:600 12px/1.35 var(--font-sans); letter-spacing:.06em; text-transform:uppercase;
+  color:var(--gray-700);
+  margin-bottom:6px;
+}
+input[type=text], input[type=password], select {
+  min-height:36px;
+  background:var(--gray-0);
+  border:1px solid var(--border-default);
+  border-radius:var(--radius-control);
+  color:var(--text-body);
+  font:400 13px/1.35 var(--font-mono);
+  padding:7px 12px;
+  transition:var(--transition-control);
+}
+input[type=text]:focus, input[type=password]:focus, select:focus {
+  border-color:var(--red-500);
+  box-shadow:var(--shadow-focus);
+}
+input::placeholder { color:var(--gray-400); opacity:1; }
+select { font-family:var(--font-sans); padding-right:32px; }
+select option { background:var(--gray-0); color:var(--text-body); }
+
+/* ── Cards ── */
+.card,
+.stat-card,
+.pair-card,
+.template-card {
+  background:var(--surface);
+  border:1px solid var(--border-subtle);
+  border-radius:var(--radius-card);
+  box-shadow:var(--shadow-sm);
+}
+.card { padding:20px; margin-bottom:16px; }
+.section-label {
+  font:700 11px/1.35 var(--font-sans); letter-spacing:.14em; text-transform:uppercase;
+  color:var(--text-muted);
+  border-bottom:1px solid var(--border-subtle);
+}
+.section-label .req-note { color:var(--red-600); font:500 11px/1.35 var(--font-sans); letter-spacing:0; }
+.card-title { font:700 16px/1.2 var(--font-display); letter-spacing:-.01em; color:var(--text-strong); }
+
+.toggle-row { border-bottom:1px solid var(--border-subtle); }
+.toggle-label { font:600 13px/1.35 var(--font-sans); color:var(--text-strong); }
+.toggle-icon.ico { width:16px; height:16px; color:var(--gray-500); }
+.toggle-body { border-bottom:1px solid var(--border-subtle); }
+
+/* ── Stats (Surus StatCard) ── */
+.stat-card { padding:16px 20px; }
+.stat-label {
+  font:700 11px/1.35 var(--font-sans); letter-spacing:.14em; text-transform:uppercase;
+  color:var(--text-muted);
+}
+.stat-value {
+  font-family:var(--font-mono); font-weight:600; font-size:21px;
+  color:var(--text-strong); font-variant-numeric:tabular-nums;
+}
+.stat-value.green { color:var(--green-500); }
+.stat-value.red { color:var(--danger-500); }
+.stat-value.yellow { color:var(--amber-text); }
+
+/* ── Logs: a white well, not a second dark surface ── */
+#log-view { background:var(--surface); color:var(--text-body); border-top:0; }
+.log-line { color:var(--text-body); }
+
+/* ── Chips (Surus Badge tones) ── */
+.chip { border-radius:var(--radius-badge); font:600 11px/1.6 var(--font-mono); }
+.chip.green { background:var(--green-50); color:var(--green-500); border:1px solid var(--green-border); }
+.chip.dim { background:var(--gray-100); color:var(--gray-700); border:1px solid var(--gray-200); }
+
+/* ── Table ── */
+.data-table th {
+  font:600 11px/1.35 var(--font-sans); letter-spacing:.06em; text-transform:uppercase;
+  color:var(--text-muted);
+  border-bottom:1px solid var(--border-subtle);
+}
+.data-table td { border-bottom:1px solid var(--border-subtle); }
+.data-table tr:hover td { background:var(--gray-50); }
+
+.pair-card.pending { border-color:var(--amber-border); background:var(--amber-50); }
+
+.save-bar { background:var(--surface); border-top:1px solid var(--border-subtle); }
+
+/* ── Backup drop zone ── */
+.dropzone { background:var(--gray-25); border:1px dashed var(--border-default); border-radius:var(--radius-card); }
+.dropzone:hover,
+.dropzone:focus-within { border-color:var(--red-500); }
+.dropzone.dragging { border-color:var(--red-500); background:var(--red-50); }
+.dropzone-icon { color:var(--gray-500); }
+.dropzone-icon .ico { width:20px; height:20px; }
+.dropzone-link { color:var(--red-600); }
+.dropzone-file { color:var(--green-500); }
+
+.restore-result { animation:fadeIn 180ms var(--ease-standard); border-radius:var(--radius-card); }
+.restore-result.ok { background:var(--green-50); border:1px solid var(--green-border); color:var(--green-500); }
+.restore-result.warn { background:var(--amber-50); border:1px solid var(--amber-border); color:var(--amber-text); }
+.restore-result.err { background:var(--danger-50); border:1px solid var(--danger-border); color:var(--danger-500); }
+
+/* ── Toast: fades, never slides ── */
+#toast {
+  background:var(--gray-0);
+  border:1px solid var(--border-subtle);
+  border-radius:var(--radius-card);
+  box-shadow:var(--shadow-md);
+  color:var(--text-body);
+  font:500 13px/1.45 var(--font-sans);
+  animation:fadeIn 180ms var(--ease-standard);
+}
+#toast.ok { border-color:var(--green-border); color:var(--green-500); }
+#toast.err { border-color:var(--danger-border); color:var(--danger-500); }
+
+::-webkit-scrollbar-thumb { background:var(--gray-300); }
+::-webkit-scrollbar-thumb:hover { background:var(--gray-400); }
+#sidebar::-webkit-scrollbar-thumb { background:var(--gray-700); }
+
+.empty-state { font:400 13px/1.55 var(--font-sans); color:var(--text-muted); }
+.hint { font-size:12px; color:var(--text-muted); }
+.hint.warn { color:var(--amber-text); }
+.codex-setup { --text-dim:var(--gray-500); }
+.codex-setup h3 { font:700 16px/1.2 var(--font-display); color:var(--text-strong); }
+.hint .ico { width:13px; height:13px; }
+
+code {
+  font-family:var(--font-mono); font-size:.92em;
+  color:var(--gray-800); background:var(--gray-100);
+  padding:1px 4px; border-radius:var(--radius-badge);
+}
+
+/* Preparation notice: Surus Alert, warning tone */
+.hindsight-upgrade-notice {
+  background:var(--amber-50);
+  border:1px solid var(--amber-border);
+  border-radius:var(--radius-card);
+  color:var(--gray-700);
+}
+.hindsight-upgrade-notice strong { color:var(--text-strong); }
+.hindsight-upgrade-notice a { color:var(--red-600); }
+
+/* ── Guide ── */
+.guide-section-title {
+  font:700 18px/1.25 var(--font-display); letter-spacing:-.01em;
+  color:var(--text-strong);
+}
+.guide-section-title .guide-num { background:var(--red-500); font-family:var(--font-mono); }
+.step-list li { border-left:2px solid var(--border-subtle); color:var(--text-body); }
+.step-list li::before { background:var(--gray-0); border:1px solid var(--border-default); color:var(--gray-600); }
+.step-list li a { color:var(--red-600); }
+.step-list li a:hover { color:var(--red-700); }
+
+.guide-callout { background:var(--blue-50); border:1px solid var(--data-dem-soft); color:var(--gray-700); }
+.guide-callout a { color:var(--red-600); }
+
+/* ── Templates ── */
+.template-card { padding:20px; }
+.template-card:hover { border-color:var(--border-strong); }
+.template-card-name { font:700 16px/1.2 var(--font-display); letter-spacing:-.01em; color:var(--text-strong); }
+.template-card-desc { font-size:13px; color:var(--text-muted); }
+
+/* ── Changelog ── */
+.changelog-entry { border-left:1px solid var(--border-subtle); }
+.changelog-entry.major::before { background:var(--red-500); border-color:var(--red-500); box-shadow:0 0 0 3px var(--red-100); }
+.changelog-entry.minor::before { background:var(--gray-0); border-color:var(--gray-400); }
+.changelog-date { font:600 13px/1.35 var(--font-mono); color:var(--text-strong); letter-spacing:0; }
+.meta-box { background:var(--gray-0); border:1px solid var(--border-subtle); border-radius:var(--radius-control); }
+.meta-label { font:700 11px/1.35 var(--font-sans); letter-spacing:.14em; color:var(--text-muted); }
+.meta-box code { background:transparent; padding:0; color:var(--text-strong); }
+.meta-box.version code { color:var(--green-500); }
+.changelog-group {
+  font:700 11px/1.35 var(--font-sans); letter-spacing:.14em; color:var(--text-muted);
+  border-bottom:1px solid var(--border-subtle);
+}
+.changelog-list li { color:var(--gray-700); }
+.changelog-list li::before { background:var(--gray-400); }
+.changelog-list li strong { color:var(--text-strong); }
+
+#sidebar-overlay { background:var(--overlay-scrim); }
+
+/* ── Tablet & below ── */
+@media (max-width: 860px) {
+  #header { padding:0; gap:0; }
+  .brand-cell { width:auto; padding:0 12px; gap:10px; }
+  .header-main { padding:0 12px; gap:10px; }
+  #sidebar { box-shadow:var(--shadow-lg); padding-top:8px; }
+  .header-issue-link { font-size:0; padding:0 8px; gap:0; }
+  .header-issue-link::before { content:none; }
+}
+
+/* ── Phones ── */
+@media (max-width: 560px) {
+  .brand-cell .surus-lockup img { height:26px; }
+  .header-product { display:none; }
+  .header-btn { font-size:0; padding:0 8px; gap:0; }
+}

@@ -1632,42 +1632,76 @@ def guard(request: Request) -> Response | None:
     return JSONResponse({"error": "Unauthorized"}, status_code=401)
 
 
+# Surus Enterprises brand assets (templates/brand/). Served without auth because
+# the sign-in page itself uses them. Only these exact names are served, so the
+# path parameter can never reach anything else on disk.
+BRAND_DIR = Path(__file__).parent / "templates" / "brand"
+BRAND_ASSETS = {
+    "surus.css": "text/css; charset=utf-8",
+    "surus-icon.png": "image/png",
+    "surus-icon-white.png": "image/png",
+    "surus-logo.png": "image/png",
+    "surus-logo-white.png": "image/png",
+}
+
+
+async def route_brand_asset(request: Request) -> Response:
+    """GET /setup/brand/<name> — Surus logo artwork and the brand stylesheet."""
+    name = request.path_params["name"]
+    media_type = BRAND_ASSETS.get(name)
+    if media_type is None:
+        return Response("Not found", status_code=404, media_type="text/plain")
+    # no-cache = revalidate by ETag each load, so a redeploy's restyle shows at once.
+    return FileResponse(BRAND_DIR / name, media_type=media_type,
+                        headers={"Cache-Control": "no-cache"})
+
+
 LOGIN_PAGE_HTML = """<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hermes Agent — Sign in</title>
+<title>Sign in · Hermes Agent · Surus Enterprises</title>
+<link rel="icon" type="image/png" href="/setup/brand/surus-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Montserrat:wght@700;800&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#0d0f14;color:#c9d1d9;font-family:'IBM Plex Sans',sans-serif;
-  min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
-.card{background:#14181f;border:1px solid #252d3d;border-radius:12px;padding:36px 32px;width:100%;max-width:380px;
-  box-shadow:0 20px 40px rgba(0,0,0,0.4)}
-.brand{text-align:center;margin-bottom:28px}
-.brand-logo{display:inline-flex;align-items:center;gap:10px;font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:18px;color:#6272ff}
-.brand-logo span{color:#6b7688;font-weight:400}
-.brand-sub{font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6b7688;margin-top:8px;letter-spacing:1.5px;text-transform:uppercase}
-label{display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6b7688;
-  letter-spacing:0.05em;text-transform:uppercase;margin-bottom:6px;margin-top:16px}
-input{width:100%;background:#0d0f14;border:1px solid #252d3d;border-radius:6px;color:#c9d1d9;
-  font-family:'IBM Plex Mono',monospace;font-size:13px;padding:9px 11px;outline:none;transition:border-color .15s}
-input:focus{border-color:#6272ff}
-button{width:100%;margin-top:24px;background:#6272ff;border:1px solid #6272ff;border-radius:6px;color:#fff;
-  font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:500;padding:10px;cursor:pointer;
-  transition:background .15s,border-color .15s}
-button:hover{background:#7b8fff;border-color:#7b8fff}
-.err{background:rgba(248,81,73,0.08);border:1px solid rgba(248,81,73,0.3);border-radius:6px;
-  color:#f85149;font-family:'IBM Plex Mono',monospace;font-size:12px;padding:8px 12px;margin-bottom:14px;text-align:center}
-.footnote{margin-top:18px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6b7688;text-align:center;line-height:1.6}
+body{background:#F5F7F9;color:#232932;font:400 15px/1.55 'IBM Plex Sans','Helvetica Neue',Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px}
+.card{background:#fff;border:1px solid #DFE4E9;border-top:3px solid #C3262F;border-radius:8px;
+  box-shadow:0 1px 2px rgba(15,18,22,.06),0 1px 1px rgba(15,18,22,.04);padding:32px;width:100%;max-width:400px}
+.brand{display:grid;justify-items:center;gap:5px;margin-bottom:24px}
+.brand img{height:72px;width:auto;display:block}
+.brand-ent{font:700 13.6px/1 Montserrat,Arial,sans-serif;letter-spacing:4.8px;text-transform:uppercase;color:#C3262F}
+.eyebrow{font:700 11px/1.35 'IBM Plex Sans',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#6B7684;text-align:center}
+h1{font:800 21px/1.18 Montserrat,'Helvetica Neue',Arial,sans-serif;letter-spacing:-.01em;color:#0F1216;text-align:center;margin-top:4px}
+label{display:block;font:600 12px/1.35 'IBM Plex Sans',sans-serif;letter-spacing:.06em;text-transform:uppercase;
+  color:#333B46;margin:16px 0 6px}
+input{width:100%;height:36px;padding:0 12px;background:#fff;border:1px solid #C3CAD3;border-radius:6px;color:#232932;
+  font:400 14px/1 'IBM Plex Sans',sans-serif;outline:none;
+  transition:border-color 120ms cubic-bezier(.2,.6,.2,1),box-shadow 120ms cubic-bezier(.2,.6,.2,1)}
+input:focus{border-color:#C3262F;box-shadow:0 0 0 3px rgba(195,38,47,.35)}
+button{width:100%;height:44px;margin-top:24px;background:#C3262F;border:1px solid #A81F27;border-radius:6px;color:#fff;
+  font:600 13px/1 'IBM Plex Sans',sans-serif;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.10);
+  transition:background-color 120ms cubic-bezier(.2,.6,.2,1),border-color 120ms cubic-bezier(.2,.6,.2,1)}
+button:hover{background:#A81F27;border-color:#8A181F}
+button:active{transform:translateY(1px);box-shadow:inset 0 1px 2px rgba(15,18,22,.14)}
+button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(195,38,47,.35)}
+.err{background:#FBECEB;border:1px solid #EFC2C4;border-radius:8px;color:#B3261E;
+  font:500 13px/1.45 'IBM Plex Sans',sans-serif;padding:10px 12px;margin-top:20px}
+.footnote{margin-top:24px;padding-top:16px;border-top:1px solid #DFE4E9;
+  font:400 12px/1.6 'IBM Plex Sans',sans-serif;color:#6B7684;text-align:center}
+.footnote code{font:500 11.5px/1 'IBM Plex Mono',monospace;color:#232932;background:#EDF0F3;padding:1px 4px;border-radius:4px}
 </style></head>
 <body>
-<div class="card">
+<main class="card">
   <div class="brand">
-    <div class="brand-logo">hermes<span>/admin</span></div>
-    <div class="brand-sub">Sign in to continue</div>
+    <img src="/setup/brand/surus-logo.png" alt="Surus">
+    <span class="brand-ent">Enterprises</span>
   </div>
+  <p class="eyebrow">Hermes Agent admin</p>
+  <h1>Sign in</h1>
   __ERROR__
   <form method="POST" action="/setup/login">
     <input type="hidden" name="returnTo" value="__RETURN_TO__">
@@ -1678,7 +1712,7 @@ button:hover{background:#7b8fff;border-color:#7b8fff}
     <button type="submit">Sign in</button>
   </form>
   <p class="footnote">Credentials are the <code>ADMIN_USERNAME</code> and <code>ADMIN_PASSWORD</code><br>Railway service variables.</p>
-</div>
+</main>
 </body></html>"""
 
 
@@ -1693,7 +1727,7 @@ async def page_login(request: Request) -> Response:
     if _is_authenticated(request):
         return RedirectResponse(_safe_return_to(request.query_params.get("returnTo", "/")), status_code=302)
     rt = _safe_return_to(request.query_params.get("returnTo", "/"))
-    error_html = ('<div class="err">Invalid username or password</div>'
+    error_html = ('<div class="err" role="alert">Sign-in failed — username or password not recognized.</div>'
                   if request.query_params.get("error") else "")
     html = (LOGIN_PAGE_HTML
             .replace("__ERROR__", error_html)
@@ -4628,46 +4662,53 @@ def _needs_dashboard_login(status: int, location: str) -> bool:
 # Shown only when hermes rejects our login — i.e. the credentials the dashboard
 # subprocess started with no longer match the ones we resolve. The usual cause
 # is ADMIN_PASSWORD changing without the dashboard being restarted.
+# Shared Surus Enterprises styling for the two dashboard status pages below.
+# Keep it free of "%" characters: DASHBOARD_UNAVAILABLE_HTML is %-formatted.
+_STATUS_PAGE_HEAD = """<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" type="image/png" href="/setup/brand/surus-icon.png">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=Montserrat:wght@700&display=swap" rel="stylesheet">
+<style>body{background:#F5F7F9;color:#232932;font:400 15px/1.55 'IBM Plex Sans','Helvetica Neue',Arial,sans-serif;
+-webkit-font-smoothing:antialiased;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:24px 16px;box-sizing:border-box}
+.card{max-width:480px;padding:32px;background:#fff;border:1px solid #DFE4E9;border-radius:8px;
+box-shadow:0 1px 2px rgba(15,18,22,.06),0 1px 1px rgba(15,18,22,.04);text-align:center}
+.mark{height:44px;width:auto;display:block;margin:0 auto 16px}
+.eyebrow{font:700 11px/1.35 'IBM Plex Sans',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#6B7684;margin:0 0 6px}
+h1{font:700 21px/1.18 Montserrat,'Helvetica Neue',Arial,sans-serif;letter-spacing:-.01em;color:#0F1216;margin:0 0 12px}
+p{font-size:14px;color:#333B46;margin:0 0 16px}
+a{display:inline-flex;align-items:center;height:36px;padding:0 20px;margin-top:4px;background:#fff;color:#232932;
+border:1px solid #C3CAD3;border-radius:6px;box-shadow:0 1px 1px rgba(15,18,22,.04);text-decoration:none;
+font:600 12px/1 'IBM Plex Sans',sans-serif;letter-spacing:.06em;text-transform:uppercase}
+a:hover{background:#F5F7F9;border-color:#98A2AF}
+a:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(195,38,47,.35)}</style>"""
+
 DASHBOARD_AUTH_FAILED_HTML = """<!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"><title>Dashboard sign-in failed</title>
-<style>body{background:#0d0f14;color:#c9d1d9;font-family:ui-monospace,Menlo,monospace;
-display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
-.card{max-width:480px;padding:32px;border:1px solid #252d3d;border-radius:12px;
-background:#14181f;text-align:center}
-h1{font-size:16px;color:#d29922;margin:0 0 12px;font-weight:600}
-p{font-size:13px;color:#6b7688;line-height:1.6;margin:0 0 16px}
-a{color:#6272ff;text-decoration:none;border:1px solid #252d3d;border-radius:6px;
-padding:7px 14px;font-size:12px;display:inline-block}
-a:hover{border-color:#6272ff}</style></head>
-<body><div class="card">
-<h1>⚠ Could not sign in to the Hermes dashboard</h1>
+<html lang="en"><head><meta charset="UTF-8"><title>Dashboard sign-in failed · Surus Enterprises</title>
+""" + _STATUS_PAGE_HEAD + """</head>
+<body><main class="card">
+<img class="mark" src="/setup/brand/surus-icon.png" alt="Surus Enterprises">
+<p class="eyebrow">Hermes dashboard</p>
+<h1>Could not sign in to the Hermes dashboard</h1>
 <p>The admin panel is fine — only the embedded dashboard rejected our sign-in.</p>
 <p>This usually means the admin password changed after the dashboard started.
 Use Apply dependencies from Status to restart the Hermes processes, or redeploy.</p>
-<a href="/setup">← Back to Setup</a>
-</div></body></html>"""
+<a href="/setup">Back to setup</a>
+</main></body></html>"""
 
 
 DASHBOARD_UNAVAILABLE_HTML = """<!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"><title>Dashboard starting…</title>
-<style>body{background:#0d0f14;color:#c9d1d9;font-family:ui-monospace,Menlo,monospace;
-display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
-.card{max-width:480px;padding:32px;border:1px solid #252d3d;border-radius:12px;
-background:#14181f;text-align:center}
-h1{font-size:16px;color:#d29922;margin:0 0 12px;font-weight:600}
-p{font-size:13px;color:#6b7688;line-height:1.6;margin:0 0 16px}
-a{color:#6272ff;text-decoration:none;border:1px solid #252d3d;border-radius:6px;
-padding:7px 14px;font-size:12px;display:inline-block}
-a:hover{border-color:#6272ff}</style></head>
-<body><div class="card">
-<h1>⚠ Hermes dashboard unavailable</h1>
+<html lang="en"><head><meta charset="UTF-8"><title>Dashboard starting… · Surus Enterprises</title>
+""" + _STATUS_PAGE_HEAD + ("""</head>
+<body><main class="card">
+<img class="mark" src="/setup/brand/surus-icon.png" alt="Surus Enterprises">
+<p class="eyebrow">Hermes dashboard</p>
+<h1>Hermes dashboard unavailable</h1>
 <p>The native Hermes dashboard is not responding on port %d.<br>
 It may still be starting up, or it may have crashed.</p>
 <p>Try refreshing in a few seconds, or head back to setup.</p>
-<a href="/setup">← Back to Setup</a>
-</div>
+<a href="/setup">Back to setup</a>
+</main>
 <script>setTimeout(()=>location.reload(),4000);</script>
-</body></html>""" % HERMES_DASHBOARD_PORT
+</body></html>""" % HERMES_DASHBOARD_PORT)
 
 
 async def _proxy_to_dashboard(request: Request) -> Response:
@@ -5109,6 +5150,7 @@ routes = [
 
     # Our setup wizard + management API, all under /setup/* (cookie-auth guarded).
     # /setup/login must precede the /setup/{path:path} catch-all further down.
+    Route("/setup/brand/{name}",                route_brand_asset,   methods=["GET", "HEAD"]),
     Route("/setup/login",                       page_login,          methods=["GET"]),
     Route("/setup/login",                       login_post,          methods=["POST"]),
     Route("/setup",                             page_index),
