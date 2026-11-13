@@ -17,7 +17,7 @@ secret is regenerated on every process start, so any ADMIN_PASSWORD change on
 Railway (which triggers a redeploy) invalidates all existing sessions.
 
 First-visit behavior: if no provider+model config exists, GET / redirects to /setup.
-Once configured, / proxies to the Hermes dashboard. A small "← Setup" widget is
+Once configured, / proxies to the Hermes dashboard. A small "Setup" widget is
 injected into every proxied HTML response so users can always return to the wizard.
 """
 
@@ -1643,6 +1643,8 @@ BRAND_ASSETS = {
     "surus-logo.png": "image/png",
     "surus-logo-white.png": "image/png",
 }
+# Hermes-side theme/skin sources live in BRAND_DIR too but are installed into
+# HERMES_HOME (apply_surus_hermes_styles), not served over HTTP.
 
 
 async def route_brand_asset(request: Request) -> Response:
@@ -1654,6 +1656,50 @@ async def route_brand_asset(request: Request) -> Response:
     # no-cache = revalidate by ETag each load, so a redeploy's restyle shows at once.
     return FileResponse(BRAND_DIR / name, media_type=media_type,
                         headers={"Cache-Control": "no-cache"})
+
+
+# Surus look for the native Hermes dashboard (a dashboard theme) and its terminal
+# UI on the Chat page (a skin): (name, source file, HERMES_HOME subdir, config key).
+# Both are re-installed and re-activated on every start, so a redeploy ships theme
+# edits and Surus stays the default; another theme picked in the dashboard lasts
+# until the next restart.
+SURUS_HERMES_STYLES = (
+    ("surus", BRAND_DIR / "hermes-dashboard-theme.yaml", "dashboard-themes", ("dashboard", "theme")),
+    ("surus", BRAND_DIR / "hermes-skin.yaml", "skins", ("display", "skin")),
+)
+
+
+def apply_surus_hermes_styles() -> None:
+    """Install the Surus dashboard theme + skin into HERMES_HOME and activate them.
+
+    Runs under cfg_lock after preparation. Uses the same fail-closed reader and
+    Hermes' atomic writer as every other config change here, and leaves a
+    malformed `dashboard:` / `display:` section alone rather than replacing it.
+    """
+    home = Path(HERMES_HOME)
+    for name, source, subdir, _ in SURUS_HERMES_STYLES:
+        content = source.read_text(encoding="utf-8")
+        target = home / subdir / f"{name}.yaml"
+        if not target.is_file() or target.read_text(encoding="utf-8") != content:
+            _atomic_write_text(target, content)
+
+    config_path = home / "config.yaml"
+    if not config_path.is_file():
+        print("[brand] config.yaml does not exist yet; Surus styles activate on the next start", flush=True)
+        return
+    config = _read_config_for_write(config_path)
+    changed = False
+    for name, _, _, (section, key) in SURUS_HERMES_STYLES:
+        block = config.setdefault(section, {})
+        if not isinstance(block, dict):
+            print(f"[brand] config.yaml '{section}' is not a mapping; left it unchanged", flush=True)
+            continue
+        if block.get(key) != name:
+            block[key] = name
+            changed = True
+    if changed:
+        _write_config_atomic(config_path, config)
+        print("[brand] Surus dashboard theme and terminal skin activated", flush=True)
 
 
 LOGIN_PAGE_HTML = """<!DOCTYPE html>
@@ -4487,20 +4533,26 @@ async def api_backup_restore(request: Request) -> Response:
 
 
 # ── Reverse proxy → Hermes dashboard ──────────────────────────────────────────
+# Surus Enterprises button styling (ink fill, uppercase label, 6px radius).
 _WIDGET_LINK_STYLE = (
-    "background:rgba(20,24,31,0.92);backdrop-filter:blur(8px);"
-    "border:1px solid #252d3d;border-radius:6px;padding:6px 12px;"
-    "color:#c9d1d9;text-decoration:none;display:inline-flex;"
-    "align-items:center;gap:6px;"
+    "background:#0F1216;border:1px solid #0F1216;border-radius:6px;"
+    "height:30px;padding:0 12px;color:#FFFFFF;text-decoration:none;"
+    "display:inline-flex;align-items:center;gap:6px;"
+    "font:600 11px/1 'IBM Plex Sans','Helvetica Neue',Arial,sans-serif;"
+    "letter-spacing:.06em;text-transform:uppercase;"
+    "box-shadow:0 2px 4px rgba(15,18,22,.06),0 4px 12px rgba(15,18,22,.06);"
 )
 BACK_TO_SETUP_WIDGET = (
     '<div id="hermes-back-widget" style="position:fixed;bottom:14px;right:14px;'
-    'z-index:99999;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;'
-    'font-size:11px;display:flex;gap:8px;">'
-    f'<a href="/setup" style="{_WIDGET_LINK_STYLE}">← Setup</a>'
+    'z-index:99999;display:flex;gap:8px;">'
+    f'<a href="/setup" style="{_WIDGET_LINK_STYLE}">Setup</a>'
     f'<a href="/logout" style="{_WIDGET_LINK_STYLE}">Sign out</a>'
     '</div>'
 )
+# Surus tab icon and title for every proxied dashboard page.
+DASHBOARD_BRAND_HEAD = '<link rel="icon" type="image/png" href="/setup/brand/surus-icon.png">'
+_DASHBOARD_TITLE_RE = re.compile(r"<title>[^<]*</title>", re.IGNORECASE)
+DASHBOARD_TITLE = "<title>Hermes Agent · Surus Enterprises</title>"
 
 # Dashboard actions that can install software at runtime. Their persistence is
 # provider-specific: PM selections and tool installs can live on the data
@@ -4784,7 +4836,7 @@ async def _proxy_to_dashboard(request: Request) -> Response:
     content = upstream.content
     content_type = upstream.headers.get("content-type", "").lower()
 
-    # Inject the "← Setup" widget into HTML pages so users can always return,
+    # Inject the "Setup" widget into HTML pages so users can always return,
     # plus the immutable-install confirm shim (see IMMUTABLE_INSTALL_WARNING_JS).
     if "text/html" in content_type and b"</body>" in content:
         try:
@@ -4794,6 +4846,8 @@ async def _proxy_to_dashboard(request: Request) -> Response:
                 BACK_TO_SETUP_WIDGET + IMMUTABLE_INSTALL_WARNING_JS + "</body>",
                 1,
             )
+            text = _DASHBOARD_TITLE_RE.sub(DASHBOARD_TITLE, text, count=1)
+            text = text.replace("</head>", DASHBOARD_BRAND_HEAD + "</head>", 1)
             content = text.encode("utf-8")
         except Exception:
             pass  # on any error, fall back to raw upstream content
@@ -4886,6 +4940,11 @@ async def _initialize_hermes(mode: str = "startup"):
                     return
                 _sanitize_env_file()
                 _consolidate_pairing_dirs()
+                try:
+                    apply_surus_hermes_styles()
+                except (OSError, ValueError, ImportError) as exc:
+                    # Branding is cosmetic: never block Hermes from starting over it.
+                    print(f"[brand] could not apply Surus styles: {exc}", flush=True)
                 if pending:
                     _write_restore_state(None)
             if await dash.start() is False:

@@ -1,0 +1,56 @@
+# Surus Enterprises skin for the Hermes terminal UI (the Chat page, CLI and TUI).
+# Installed by server.py into $HERMES_HOME/skins/surus.yaml at startup and made
+# active with display.skin: surus. Schema: hermes_cli/skin_engine.py (v0.22.2);
+# keys left out inherit Hermes' default skin.
+#
+# The dashboard's chat terminal keeps a near-black background, so these are the
+# Surus light-on-ink values (white/slate text, red-400 accent). Green and amber
+# have no dark-surface token in the design system; the ok/warn tints below are
+# lightened from green-500 / amber-500 so they stay readable on ink.
+name: surus
+description: Surus Enterprises — brand red and slate on ink
+
+colors:
+  banner_title: "#FFFFFF"
+  banner_text: "#DFE4E9"       # gray-200
+  banner_accent: "#D25E64"     # red-400
+  banner_dim: "#98A2AF"        # gray-400
+  banner_border: "#4C5663"     # gray-600
+  ui_accent: "#D25E64"
+  ui_tool: "#D25E64"
+  ui_label: "#C3CAD3"          # gray-300
+  ui_text: "#DFE4E9"
+  ui_border: "#333B46"         # gray-700
+  ui_ok: "#5FB98A"
+  ui_warn: "#E0A33B"
+  ui_error: "#E2969A"          # red-300
+  prompt: "#FFFFFF"
+  input_rule: "#C3262F"        # red-500, the mark's red
+  response_border: "#C3262F"
+  status_bar_bg: "#171B21"     # gray-900
+  status_bar_text: "#C3CAD3"
+  status_bar_strong: "#FFFFFF"
+  status_bar_dim: "#6B7684"    # gray-500
+  status_bar_good: "#5FB98A"
+  status_bar_warn: "#E0A33B"
+  status_bar_bad: "#D25E64"
+  status_bar_critical: "#E2969A"
+  session_label: "#C3CAD3"
+  session_border: "#333B46"
+  completion_menu_bg: "#171B21"
+  completion_menu_current_bg: "#333B46"
+  selection_bg: "#6B1218"      # red-800
+  shell_dollar: "#D25E64"
+  voice_status_bg: "#171B21"
+
+branding:
+  help_header: "Available commands"
+
+banner_logo: |
+  [bold #C3262F]███████╗██╗   ██╗██████╗ ██╗   ██╗███████╗[/]
+  [bold #C3262F]██╔════╝██║   ██║██╔══██╗██║   ██║██╔════╝[/]
+  [bold #C3262F]███████╗██║   ██║██████╔╝██║   ██║███████╗[/]
+  [bold #C3262F]╚════██║██║   ██║██╔══██╗██║   ██║╚════██║[/]
+  [bold #C3262F]███████║╚██████╔╝██║  ██║╚██████╔╝███████║[/]
+  [bold #C3262F]╚══════╝ ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚══════╝[/]
+  [#98A2AF]E N T E R P R I S E S[/]
