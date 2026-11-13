@@ -1,0 +1,177 @@
+# Surus Enterprises theme for the native Hermes dashboard.
+# Installed by server.py into $HERMES_HOME/dashboard-themes/surus.yaml at startup
+# and made active with `hermes config set dashboard.theme surus`.
+# Schema: hermes_cli/web_server_dashboard.py::_normalise_theme_definition (v0.22.2).
+# Values come from the Surus Design System tokens. customCSS targets Hermes'
+# dashboard markup; re-check it after a Hermes upgrade.
+name: surus
+label: Surus Enterprises
+description: Surus brand — ink sidebar, brand red, IBM Plex and Montserrat
+palette:
+  background: "#F5F7F9"        # surface-page (gray-50)
+  midground: "#0F1216"         # ink: text and chrome
+  foreground: { hex: "#C3262F", alpha: 0 }
+  warmGlow: "rgba(195, 38, 47, 0)"
+  noiseOpacity: 0
+typography:
+  fontSans: '"IBM Plex Sans", "Helvetica Neue", Arial, sans-serif'
+  fontMono: '"IBM Plex Mono", ui-monospace, Menlo, monospace'
+  fontDisplay: '"Montserrat", "Helvetica Neue", Arial, sans-serif'
+  fontUrl: "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Montserrat:wght@600;700;800;900&display=swap"
+  baseSize: "15px"
+  lineHeight: "1.55"
+  letterSpacing: "0"
+layout:
+  radius: "0.5rem"             # 8px cards; Hermes derives 6px controls, 4px chips
+  density: comfortable
+assets:
+  logo: /setup/brand/surus-icon-white.png
+colorOverrides:
+  primary: "#C3262F"
+  primaryForeground: "#FFFFFF"
+  ring: "#C3262F"
+  destructive: "#B3261E"
+  success: "#1E7A4C"
+  warning: "#B8791A"
+  border: "#DFE4E9"
+  input: "#C3CAD3"
+componentStyles:
+  sidebar:
+    background: "#0F1216"
+  header:
+    background: "#0F1216"
+customCSS: |
+  /* ── Ink surfaces: re-scope the palette so every utility inside reads light-on-ink ── */
+  #app-sidebar,
+  header[class*="lg:hidden"] {
+    --background-base: #0F1216;
+    --background: #0F1216;
+    --midground-base: #FFFFFF;
+    --midground: #FFFFFF;
+    --text-primary: #FFFFFF;
+    --text-secondary: #C3CAD3;
+    --text-tertiary: #98A2AF;
+    background: #0F1216 !important;
+    color: #C3CAD3;
+    border-color: rgba(255, 255, 255, .16) !important;
+  }
+  #app-sidebar [class*="border-current"] { border-color: rgba(255, 255, 255, .16) !important; }
+
+  /* ── Logo lockup: Surus elephant + SURUS / ENTERPRISES, replacing "Hermes Agent" ── */
+  #app-sidebar > div:first-child > div:first-child > :last-child,
+  header[class*="lg:hidden"] > :last-child {
+    position: relative;
+    display: block;
+    width: 132px;
+    height: 30px;
+    font-size: 0 !important;
+    line-height: 0 !important;
+    color: transparent !important;
+    background: var(--theme-asset-logo) left center / auto 30px no-repeat;
+  }
+  #app-sidebar > div:first-child > div:first-child > :last-child br,
+  header[class*="lg:hidden"] > :last-child br { display: none; }
+  #app-sidebar > div:first-child > div:first-child > :last-child::before,
+  header[class*="lg:hidden"] > :last-child::before {
+    content: "SURUS";
+    position: absolute; left: 38px; top: 5px;
+    font: 900 16.2px/1 "Montserrat", Arial, sans-serif;
+    letter-spacing: .02em; color: #FFFFFF;
+  }
+  #app-sidebar > div:first-child > div:first-child > :last-child::after,
+  header[class*="lg:hidden"] > :last-child::after {
+    content: "ENTERPRISES";
+    position: absolute; left: 38px; top: 22.5px;
+    font: 700 6.5px/1 "Montserrat", Arial, sans-serif;
+    letter-spacing: .89px; color: rgba(255, 255, 255, .85);
+  }
+
+  /* ── Sidebar navigation: Surus SidebarNav rows ── */
+  #app-sidebar nav a {
+    margin: 1px 8px;
+    padding: 0 12px;
+    min-height: 36px;
+    border-radius: 6px;
+    font: 500 13px/1 var(--theme-font-sans);
+    text-transform: none;
+    letter-spacing: 0;
+    color: #C3CAD3;
+    transition: background-color 120ms cubic-bezier(.2,.6,.2,1), color 120ms cubic-bezier(.2,.6,.2,1);
+  }
+  #app-sidebar nav a:hover { color: #FFFFFF; background: rgba(255, 255, 255, .07); }
+  #app-sidebar nav a > span[aria-hidden] { display: none; }
+  #app-sidebar nav a[aria-current="page"] {
+    background: #C3262F;
+    color: #FFFFFF;
+    font-weight: 600;
+  }
+  #app-sidebar nav [role="group"] > span {
+    font: 700 11px/1.35 var(--theme-font-sans);
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: #98A2AF;
+  }
+
+  /* ── Type: Montserrat headings, IBM Plex everywhere else ── */
+  h1, h2, h3 {
+    font-family: var(--theme-font-display);
+    letter-spacing: -.01em;
+  }
+  /* Hermes' kit uses typewriter (Courier) and pixel (Mondwest) faces for UI text;
+     Surus sets UI text in IBM Plex Sans. Code and data stay IBM Plex Mono. */
+  .font-courier, .font-mondwest { font-family: var(--theme-font-sans) !important; }
+  ::selection { background: #F8E2E3; color: #0F1216; }
+  :focus-visible { outline-color: #C3262F; }
+
+  /* ── Buttons: Surus Button (uppercase label, 6px radius, hover darkens) ── */
+  button[class*="shadow-[inset_-1px_-1px"] {
+    font: 600 11px/1 var(--theme-font-sans) !important;
+    letter-spacing: .06em !important;
+    text-transform: uppercase;
+    min-height: 32px;
+    padding: 0 14px !important;
+    gap: 6px;
+    border: 1px solid #C3CAD3 !important;
+    border-radius: 6px !important;
+    background: #FFFFFF !important;
+    color: #232932 !important;
+    box-shadow: 0 1px 1px rgba(15, 18, 22, .04) !important;
+    filter: none !important;
+    transition: background-color 120ms cubic-bezier(.2,.6,.2,1), border-color 120ms cubic-bezier(.2,.6,.2,1);
+  }
+  button[class*="shadow-[inset_-1px_-1px"]:hover { background: #F5F7F9 !important; border-color: #98A2AF !important; }
+  button[class*="shadow-[inset_-1px_-1px"]:active { transform: translateY(1px); box-shadow: inset 0 1px 2px rgba(15, 18, 22, .14) !important; }
+  button[class*="shadow-[inset_-1px_-1px"]:not([class*="bg-transparent"]):not(:disabled) {
+    background: #C3262F !important;
+    border-color: #A81F27 !important;
+    color: #FFFFFF !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .10) !important;
+  }
+  button[class*="shadow-[inset_-1px_-1px"]:not([class*="bg-transparent"]):not(:disabled):hover {
+    background: #A81F27 !important;
+    border-color: #8A181F !important;
+  }
+  button[class*="shadow-[inset_-1px_-1px"]:disabled { opacity: .45; }
+  #app-sidebar button[class*="shadow-[inset_-1px_-1px"] { background: transparent !important; color: #FFFFFF !important; border-color: rgba(255, 255, 255, .16) !important; }
+
+  /* ── Inputs: Surus Input ── */
+  input[class*="border-midground"], textarea[class*="border-midground"], select[class*="border-midground"] {
+    background: #FFFFFF !important;
+    border: 1px solid #C3CAD3 !important;
+    border-radius: 6px !important;
+    color: #232932 !important;
+    font-size: 13px !important;
+  }
+  input[class*="border-midground"]::placeholder, textarea[class*="border-midground"]::placeholder { color: #98A2AF !important; }
+  input[class*="border-midground"]:focus-visible, textarea[class*="border-midground"]:focus-visible, select[class*="border-midground"]:focus-visible {
+    border-color: #C3262F !important;
+    box-shadow: 0 0 0 3px rgba(195, 38, 47, .35) !important;
+    --tw-ring-color: transparent;
+  }
+
+  /* ── Segmented tabs ── */
+  button.font-mondwest {
+    font: 600 11px/1 var(--theme-font-sans) !important;
+    letter-spacing: .06em !important;
+    text-transform: uppercase;
+  }
