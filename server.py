@@ -937,6 +937,8 @@ def build_hermes_env() -> dict[str, str]:
     validate_profile_execution_environment(Path(HERMES_HOME))
     env = {**os.environ, "HERMES_HOME": HERMES_HOME}
     env.update(read_env(ENV_FILE))
+    for key in MERCURY_PRIVATE_ENV_KEYS:
+        env.pop(key, None)  # Google sign-in secrets stay in this process
     for key in IMAGE_EXECUTION_ENV_KEYS:
         if key in os.environ:
             env[key] = os.environ[key]
@@ -1590,7 +1592,141 @@ def _verify_auth_token(token: str) -> bool:
 
 
 def _is_authenticated(request: Request) -> bool:
-    return _verify_auth_token(request.cookies.get(COOKIE_NAME, ""))
+    """Admin access: the username/password cookie, or a Google admin.
+
+    With Google sign-in on, the username/password login stays available at
+    /setup/login as an emergency way in (e.g. if Google OAuth breaks).
+    """
+    if _verify_auth_token(request.cookies.get(COOKIE_NAME, "")):
+        return True
+    user = google_user(request)
+    return bool(user and user.get("role") == "admin")
+
+
+# ── Google sign-in (Surus Enterprises staff) ──────────────────────────────────
+# surus-auth (vendored in ./surus_auth) gates every page with Google sign-in once
+# GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set; without them Mercury keeps
+# the username/password admin login only. Signed-in staff ("member" role) get
+# MEMBER_HOME; Setup and the native Hermes dashboard stay admin-only, because
+# the dashboard exposes API keys and every user's chats.
+GOOGLE_COOKIE_NAME = "mercury_session"
+MEMBER_HOME = "/ask"
+MERCURY_DIR = Path(HERMES_HOME).parent / ".mercury"
+# Fail closed: surus-auth admits ANY Google account when no allowlist is set,
+# so an unset (or blanked) allowlist falls back to the two Surus domains.
+_DEFAULT_ALLOWED_DOMAINS = "surusenterprises.com,americanstewardship.org"
+# Google admins come only from the ADMIN_BOOTSTRAP_EMAILS Railway variable
+# (comma-separated). Unset means no Google account is an admin; the
+# username/password emergency login still is.
+_ALLOWLIST_ENV_NAMES = ("ALLOWED_EMAIL_DOMAIN", "ALLOWED_EMAIL_DOMAINS",
+                        "GOOGLE_WORKSPACE_DOMAIN", "ALLOWED_EMAILS")
+# Reachable without Google sign-in: Railway's health check, the emergency
+# username/password login and its brand assets, and logout.
+GOOGLE_PUBLIC_PREFIXES = ("/health", "/setup/login", "/setup/brand/", "/logout", "/login")
+# Secrets the Hermes subprocesses never need (see build_hermes_env).
+MERCURY_PRIVATE_ENV_KEYS = ("GOOGLE_CLIENT_SECRET", "SESSION_SECRET")
+
+_google_engine = None  # surus_auth AuthEngine once Google sign-in is on
+
+
+def google_signin_configured() -> bool:
+    return bool(os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+                and os.environ.get("GOOGLE_CLIENT_SECRET", "").strip())
+
+
+def google_user(conn) -> dict | None:
+    """The signed-in Google user ({email, name, role, ...}) or None.
+
+    HTTP requests carry it in the scope (set by the surus-auth middleware).
+    WebSockets bypass that middleware, so their cookie is verified here.
+    """
+    if _google_engine is None:
+        return None
+    from surus_auth.asgi import SCOPE_KEY
+    user = conn.scope.get(SCOPE_KEY)
+    if user is None and conn.scope.get("type") == "websocket":
+        user = _google_engine.user_from_cookies(conn.headers.get("cookie", ""))
+    return user
+
+
+def _prepare_google_signin_env() -> None:
+    if not any(os.environ.get(name, "").strip() for name in _ALLOWLIST_ENV_NAMES):
+        os.environ["ALLOWED_EMAIL_DOMAIN"] = _DEFAULT_ALLOWED_DOMAINS
+    if not os.environ.get("ADMIN_BOOTSTRAP_EMAILS", "").strip():
+        print("[auth] ADMIN_BOOTSTRAP_EMAILS is not set: no Google account is an admin; "
+              "use the username/password login at /setup/login", flush=True)
+
+
+def _mercury_session_secret() -> str:
+    """SESSION_SECRET if set, else one generated once and kept on the volume,
+    so Google sessions survive redeploys without another Railway variable."""
+    explicit = os.environ.get("SESSION_SECRET", "").strip()
+    if explicit:
+        return explicit
+    path = MERCURY_DIR / "session_secret"
+    try:
+        existing = path.read_text(encoding="utf-8").strip()
+    except FileNotFoundError:
+        existing = ""
+    if existing:
+        return existing
+    secret = secrets.token_urlsafe(48)
+    _atomic_write_text(path, secret + "\n")
+    return secret
+
+
+def _scope_cookie(scope: dict, name: str) -> str:
+    from http.cookies import SimpleCookie
+    for key, value in scope.get("headers") or ():
+        if key == b"cookie":
+            try:
+                jar = SimpleCookie()
+                jar.load(value.decode("latin-1"))
+            except Exception:
+                return ""
+            morsel = jar.get(name)
+            return morsel.value if morsel else ""
+    return ""
+
+
+class MercuryAuthGate:
+    """Outermost ASGI layer: Google sign-in, with the emergency login exempt.
+
+    A request carrying a valid username/password cookie goes straight to the
+    app (that cookie is admin access on its own); everything else goes through
+    surus-auth. WebSocket and lifespan scopes are not gated here; ws_proxy
+    checks admin access itself.
+    """
+
+    def __init__(self, app):
+        global _google_engine
+        self.app = app
+        self.google = None
+        if not google_signin_configured():
+            _google_engine = None
+            print("[auth] Google sign-in off (GOOGLE_CLIENT_ID/SECRET not set); "
+                  "username/password admin login only", flush=True)
+            return
+        _prepare_google_signin_env()
+        from surus_auth import reload_config
+        from surus_auth.asgi import protect
+        reload_config()
+        self.google = protect(
+            app,
+            public_url=(os.environ.get("APP_URL") or os.environ.get("PUBLIC_URL")
+                        or hermes_dashboard_public_url() or "http://localhost:8080"),
+            session_secret=_mercury_session_secret(),
+            cookie_name=GOOGLE_COOKIE_NAME,
+            public_prefixes=GOOGLE_PUBLIC_PREFIXES,
+        )
+        _google_engine = self.google.engine
+
+    async def __call__(self, scope, receive, send):
+        if self.google is None or scope.get("type") != "http":
+            return await self.app(scope, receive, send)
+        if _verify_auth_token(_scope_cookie(scope, COOKIE_NAME)):
+            return await self.app(scope, receive, send)
+        return await self.google(scope, receive, send)
 
 
 def _safe_return_to(value: str) -> str:
@@ -1624,6 +1760,11 @@ def guard(request: Request) -> Response | None:
         return None
     accept = request.headers.get("accept", "").lower()
     wants_html = "text/html" in accept
+    if google_user(request) is not None:
+        # Signed in with Google, but not an admin: send staff to their page.
+        if wants_html:
+            return RedirectResponse(MEMBER_HOME, status_code=302)
+        return JSONResponse({"error": "Admins only"}, status_code=403)
     if wants_html:
         rt = request.url.path
         if request.url.query:
@@ -1739,6 +1880,9 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(195,38,47,.35)}
 .footnote{margin-top:24px;padding-top:16px;border-top:1px solid #DFE4E9;
   font:400 12px/1.6 'IBM Plex Sans',sans-serif;color:#6B7684;text-align:center}
 .footnote code{font:500 11.5px/1 'IBM Plex Mono',monospace;color:#232932;background:#EDF0F3;padding:1px 4px;border-radius:4px}
+.alt{margin-top:12px;text-align:center;font:500 13px/1.4 'IBM Plex Sans',sans-serif}
+.alt a{color:#A81F27;text-decoration:none;border-bottom:1px solid rgba(195,38,47,.28)}
+.alt a:hover{color:#8A181F;border-bottom-color:#A81F27}
 </style></head>
 <body>
 <main class="card">
@@ -1758,6 +1902,7 @@ button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(195,38,47,.35)}
     <button type="submit">Sign in</button>
   </form>
   <p class="footnote">Credentials are the <code>ADMIN_USERNAME</code> and <code>ADMIN_PASSWORD</code><br>Railway service variables.</p>
+  __GOOGLE__
 </main>
 </body></html>"""
 
@@ -1775,9 +1920,12 @@ async def page_login(request: Request) -> Response:
     rt = _safe_return_to(request.query_params.get("returnTo", "/"))
     error_html = ('<div class="err" role="alert">Sign-in failed — username or password not recognized.</div>'
                   if request.query_params.get("error") else "")
+    google_html = ('<p class="alt"><a href="/auth/login">Sign in with Google instead</a></p>'
+                   if _google_engine is not None else "")
     html = (LOGIN_PAGE_HTML
             .replace("__ERROR__", error_html)
-            .replace("__RETURN_TO__", _html_escape(rt)))
+            .replace("__RETURN_TO__", _html_escape(rt))
+            .replace("__GOOGLE__", google_html))
     return HTMLResponse(html)
 
 
@@ -1806,15 +1954,78 @@ async def login_post(request: Request) -> Response:
 
 async def login_redirect(request: Request) -> Response:
     """GET /login — keep old bookmarks working after the move to /setup/login."""
-    rt = request.query_params.get("returnTo") or request.query_params.get("next") or "/"
-    return RedirectResponse(
-        f"/setup/login?returnTo={_url_quote(_safe_return_to(rt))}", status_code=302
-    )
+    rt = _safe_return_to(request.query_params.get("returnTo") or request.query_params.get("next") or "/")
+    if _google_engine is not None:
+        return RedirectResponse(f"/auth/login?next={_url_quote(rt)}", status_code=302)
+    return RedirectResponse(f"/setup/login?returnTo={_url_quote(rt)}", status_code=302)
+
+
+ASK_PAGE_HTML = """<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mercury · Surus Enterprises</title>
+<link rel="icon" type="image/png" href="/setup/brand/surus-icon.png">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Montserrat:wght@700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#F5F7F9;color:#232932;font:400 15px/1.55 'IBM Plex Sans','Helvetica Neue',Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;min-height:100vh;display:flex;flex-direction:column}
+header{height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;background:#0F1216;color:#fff}
+.lockup{display:inline-flex;align-items:center;gap:12px;color:#fff;text-decoration:none}
+.lockup img{height:30px;width:auto;display:block}
+.wm{display:grid;gap:1px;line-height:1}
+.wm span:first-child{font:900 16.2px/1 Montserrat,Arial,sans-serif;letter-spacing:.02em;text-transform:uppercase}
+.wm span:last-child{font:700 6.5px/1 Montserrat,Arial,sans-serif;letter-spacing:.89px;text-transform:uppercase;opacity:.85}
+.who{display:flex;align-items:center;gap:16px;font:500 12px/1 'IBM Plex Sans',sans-serif;color:#C3CAD3}
+.who a{color:#fff;text-decoration:none;font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:11px}
+main{flex:1;display:flex;align-items:center;justify-content:center;padding:24px 16px}
+.card{background:#fff;border:1px solid #DFE4E9;border-top:3px solid #C3262F;border-radius:8px;
+  box-shadow:0 1px 2px rgba(15,18,22,.06),0 1px 1px rgba(15,18,22,.04);padding:32px;max-width:520px;width:100%}
+.eyebrow{font:700 11px/1.35 'IBM Plex Sans',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#6B7684}
+h1{font:800 26px/1.15 Montserrat,'Helvetica Neue',Arial,sans-serif;letter-spacing:-.01em;color:#0F1216;margin:6px 0 12px}
+p{color:#333B46;margin-bottom:12px}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+.btn{display:inline-flex;align-items:center;height:36px;padding:0 18px;border-radius:6px;text-decoration:none;
+  font:600 12px/1 'IBM Plex Sans',sans-serif;letter-spacing:.06em;text-transform:uppercase;border:1px solid #C3CAD3;color:#232932;background:#fff}
+.btn:hover{background:#F5F7F9;border-color:#98A2AF}
+.btn.primary{background:#C3262F;border-color:#A81F27;color:#fff}
+.btn.primary:hover{background:#A81F27}
+</style></head>
+<body>
+<header>
+  <a class="lockup" href="/ask"><img src="/setup/brand/surus-icon-white.png" alt=""><span class="wm"><span>Surus</span><span>Enterprises</span></span></a>
+  <div class="who"><span>__EMAIL__</span><a href="/logout">Sign out</a></div>
+</header>
+<main><section class="card">
+  <p class="eyebrow">Mercury</p>
+  <h1>Hi __NAME__.</h1>
+  <p>You're signed in. The Mercury chat for voter-file questions is being set up and will appear on this page.</p>
+  __ADMIN__
+</section></main>
+</body></html>"""
+
+
+async def page_ask(request: Request) -> Response:
+    """GET /ask — the staff home page (the Mercury chat lands here in a later PR)."""
+    user = google_user(request)
+    admin = _is_authenticated(request)
+    if user is None and not admin:
+        return guard(request)
+    email = (user or {}).get("email") or "Admin"
+    name = (user or {}).get("first_name") or (user or {}).get("name") or "there"
+    admin_html = ('<div class="actions"><a class="btn primary" href="/setup">Open Setup</a>'
+                  '<a class="btn" href="/?force=1">Open Hermes dashboard</a></div>' if admin else "")
+    html = (ASK_PAGE_HTML
+            .replace("__EMAIL__", _html_escape(email))
+            .replace("__NAME__", _html_escape(name))
+            .replace("__ADMIN__", admin_html))
+    return HTMLResponse(html)
 
 
 async def logout(request: Request) -> Response:
-    """GET /logout — clear cookie and bounce to login."""
-    resp = RedirectResponse("/setup/login", status_code=302)
+    """GET /logout — clear the admin cookie, then end the Google session too."""
+    target = "/auth/logout" if _google_engine is not None else "/setup/login"
+    resp = RedirectResponse(target, status_code=302)
     resp.delete_cookie(COOKIE_NAME, path="/")
     return resp
 
@@ -5210,6 +5421,7 @@ routes = [
     # Our setup wizard + management API, all under /setup/* (cookie-auth guarded).
     # /setup/login must precede the /setup/{path:path} catch-all further down.
     Route("/setup/brand/{name}",                route_brand_asset,   methods=["GET", "HEAD"]),
+    Route("/ask",                               page_ask,            methods=["GET"]),
     Route("/setup/login",                       page_login,          methods=["GET"]),
     Route("/setup/login",                       login_post,          methods=["POST"]),
     Route("/setup",                             page_index),
@@ -5279,6 +5491,9 @@ routes = [
 # No middleware — auth is enforced per-handler via guard(). This keeps /health
 # and /login truly unauthenticated without middleware gymnastics.
 app = Starlette(routes=routes, lifespan=lifespan)
+# uvicorn serves this: Google sign-in around the app (a pass-through when off).
+# Tests drive `app` directly.
+asgi_app = MercuryAuthGate(app)
 
 if __name__ == "__main__":
     import uvicorn
@@ -5286,7 +5501,7 @@ if __name__ == "__main__":
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     # ws_max_size: browser -> us leg of the same pairing (uvicorn defaults 16 MiB).
-    config = uvicorn.Config(app, host="0.0.0.0", port=port, log_level="info", loop="asyncio",
+    config = uvicorn.Config(asgi_app, host="0.0.0.0", port=port, log_level="info", loop="asyncio",
                             ws_max_size=HERMES_WS_MAX_BYTES)
     server = uvicorn.Server(config)
 
