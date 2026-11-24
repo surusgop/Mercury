@@ -939,6 +939,13 @@ def build_hermes_env() -> dict[str, str]:
     env.update(read_env(ENV_FILE))
     for key in MERCURY_PRIVATE_ENV_KEYS:
         env.pop(key, None)  # Google sign-in secrets stay in this process
+    # The Surus Databricks plugin reads Mercury's chat records and drops log rows here.
+    env["MERCURY_DIR"] = str(MERCURY_DIR)
+    if surus_agents_configured():
+        # The default profile's API server is the one loopback listener the
+        # multiplexing gateway serves /p/<profile>/ on (see provision_surus_agents).
+        env.update({"API_SERVER_ENABLED": "true", "API_SERVER_KEY": hermes_api_server_key(),
+                    "API_SERVER_HOST": HERMES_API_SERVER_HOST, "API_SERVER_PORT": str(HERMES_API_SERVER_PORT)})
     for key in IMAGE_EXECUTION_ENV_KEYS:
         if key in os.environ:
             env[key] = os.environ[key]
@@ -1841,6 +1848,172 @@ def apply_surus_hermes_styles() -> None:
     if changed:
         _write_config_atomic(config_path, config)
         print("[brand] Surus dashboard theme and terminal skin activated", flush=True)
+
+
+# ── Surus agents: the staff and optimizer Hermes profiles ─────────────────────
+# Mercury's staff chat (and later Signal) talks to two named Hermes profiles
+# served by the one multiplexing gateway through Hermes' API server:
+#   staff      the Surus Intelligence voter-file assistant (IL / WI / MI)
+#   optimizer  the tech team's Databricks notebook optimizer (admins only)
+# Both run Grok 4.7 via OpenRouter with only the Surus Databricks plugin's tools,
+# no memory, and an empty working directory. They are created and re-asserted on
+# every start, but only once Databricks is configured (DATABRICKS_HOST plus a
+# token or service principal), so nothing changes before then.
+SURUS_AGENT_TOOLSETS = {
+    "staff": ["surus_databricks"],
+    "optimizer": ["surus_databricks", "surus_optimizer"],
+}
+SURUS_AGENT_PLATFORMS = ("api_server", "signal", "cli")
+# Never available to these agents on any platform, whatever a default says.
+SURUS_AGENT_BLOCKED_TOOLSETS = [
+    "terminal", "file", "code_execution", "delegation", "web", "search", "x_search", "browser",
+    "computer_use", "memory", "session_search", "skills", "cronjob", "kanban", "connections", "clarify",
+]
+SURUS_AGENTS_DIR = Path(__file__).parent / "templates" / "agents"
+SURUS_PLUGIN_SRC = Path(__file__).parent / "hermes_plugins" / "surus_databricks"
+SURUS_PLUGIN_NAME = "surus_databricks"
+HERMES_API_SERVER_HOST = "127.0.0.1"
+HERMES_API_SERVER_PORT = 8642
+surus_agents_status: dict = {"enabled": False, "agents": {}, "error": ""}
+
+
+def surus_agent_model() -> str:
+    return os.environ.get("SURUS_AGENT_MODEL", "").strip() or "x-ai/grok-4.7"
+
+
+def surus_agents_configured() -> bool:
+    """Databricks settings present: the agents are useless without them."""
+    env = os.environ
+    return bool(env.get("DATABRICKS_HOST", "").strip() and (
+        env.get("DATABRICKS_TOKEN", "").strip()
+        or (env.get("DATABRICKS_CLIENT_ID", "").strip() and env.get("DATABRICKS_CLIENT_SECRET", "").strip())))
+
+
+def surus_agent_home(name: str) -> Path:
+    return Path(HERMES_HOME) / "profiles" / name
+
+
+def _persisted_secret(path: Path) -> str:
+    try:
+        existing = path.read_text(encoding="utf-8").strip()
+    except FileNotFoundError:
+        existing = ""
+    if existing:
+        return existing
+    secret = secrets.token_urlsafe(32)
+    _atomic_write_text(path, secret + "\n")
+    return secret
+
+
+def hermes_api_server_key() -> str:
+    """Bearer key for the default profile's API server listener (loopback only)."""
+    return _persisted_secret(MERCURY_DIR / "api_server_key")
+
+
+def surus_agent_api_key(name: str) -> str:
+    """The profile's own API_SERVER_KEY, which authenticates /p/<name>/ requests."""
+    return read_env(surus_agent_home(name) / ".env").get("API_SERVER_KEY", "")
+
+
+def _sync_tree(src: Path, dest: Path) -> bool:
+    """Make dest an exact copy of src (files only). True when anything changed."""
+    changed = False
+    wanted = {p.relative_to(src) for p in src.rglob("*") if p.is_file() and "__pycache__" not in p.parts}
+    for rel in wanted:
+        target = dest / rel
+        data = (src / rel).read_bytes()
+        if not target.is_file() or target.read_bytes() != data:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(data)
+            changed = True
+    if dest.is_dir():
+        for path in sorted(dest.rglob("*"), reverse=True):
+            rel = path.relative_to(dest)
+            if path.is_file() and rel not in wanted and "__pycache__" not in rel.parts:
+                path.unlink()
+                changed = True
+    return changed
+
+
+def _configure_surus_agent(name: str) -> None:
+    home = surus_agent_home(name)
+    # Persona: the old chatbot's prompt verbatim, then how Mercury works.
+    agent_dir = SURUS_AGENTS_DIR / name
+    soul = (agent_dir / "prompt.txt").read_text(encoding="utf-8").rstrip() + "\n\n" + \
+        (agent_dir / "mercury.md").read_text(encoding="utf-8")
+    soul_path = home / "SOUL.md"
+    if not soul_path.is_file() or soul_path.read_text(encoding="utf-8") != soul:
+        _atomic_write_text(soul_path, soul)
+    _sync_tree(SURUS_PLUGIN_SRC, home / "plugins" / SURUS_PLUGIN_NAME)
+    workdir = MERCURY_DIR / "agents" / name
+    workdir.mkdir(parents=True, exist_ok=True)
+
+    # Keys: the profile's own API server key, and the OpenRouter key from the
+    # default profile (Hermes never shares credentials across profiles).
+    env_path = home / ".env"
+    env = read_env(env_path)
+    wanted = dict(env)
+    if not wanted.get("API_SERVER_KEY"):
+        wanted["API_SERVER_KEY"] = secrets.token_urlsafe(32)
+    openrouter = read_env(ENV_FILE).get("OPENROUTER_API_KEY") or os.environ.get("OPENROUTER_API_KEY", "")
+    if openrouter:
+        wanted["OPENROUTER_API_KEY"] = openrouter
+    if wanted != env:
+        write_env(env_path, wanted)
+
+    config_path = home / "config.yaml"
+    config = _read_config_for_write(config_path)
+    before = json.dumps(config, sort_keys=True, default=str)
+    model = config.get("model") if isinstance(config.get("model"), dict) else {}
+    model.update({"provider": "openrouter", "default": surus_agent_model()})
+    config["model"] = model
+    platform_toolsets = config.get("platform_toolsets") if isinstance(config.get("platform_toolsets"), dict) else {}
+    for platform in SURUS_AGENT_PLATFORMS:
+        platform_toolsets[platform] = list(SURUS_AGENT_TOOLSETS[name])
+    config["platform_toolsets"] = platform_toolsets
+    agent_cfg = config.get("agent") if isinstance(config.get("agent"), dict) else {}
+    agent_cfg["disabled_toolsets"] = list(SURUS_AGENT_BLOCKED_TOOLSETS)
+    config["agent"] = agent_cfg
+    memory = config.get("memory") if isinstance(config.get("memory"), dict) else {}
+    memory.update({"memory_enabled": False, "user_profile_enabled": False})
+    config["memory"] = memory
+    plugins = config.get("plugins") if isinstance(config.get("plugins"), dict) else {}
+    enabled = [p for p in (plugins.get("enabled") or []) if isinstance(p, str)]
+    if SURUS_PLUGIN_NAME not in enabled:
+        enabled.append(SURUS_PLUGIN_NAME)
+    plugins["enabled"] = enabled
+    config["plugins"] = plugins
+    terminal = config.get("terminal") if isinstance(config.get("terminal"), dict) else {}
+    terminal["cwd"] = str(workdir)
+    config["terminal"] = terminal
+    if json.dumps(config, sort_keys=True, default=str) != before:
+        _write_config_atomic(config_path, config)
+
+
+async def provision_surus_agents() -> None:
+    """Create/refresh the staff and optimizer profiles (see the block comment above)."""
+    surus_agents_status.update(enabled=surus_agents_configured(), error="")
+    if not surus_agents_status["enabled"]:
+        print("[agents] Databricks is not configured (DATABRICKS_HOST and a token or service "
+              "principal); the Surus agents stay off", flush=True)
+        return
+    for name in SURUS_AGENT_TOOLSETS:
+        state = surus_agents_status["agents"].setdefault(name, {})
+        try:
+            if not (surus_agent_home(name) / "config.yaml").is_file():
+                rc, out = await _run_hermes_cli("profile", "create", name, "--no-alias", "--no-skills",
+                                                timeout=180)
+                if rc != 0:
+                    raise RuntimeError(f"hermes profile create {name} failed: {out.strip()[-300:]}")
+                print(f"[agents] created the {name} profile", flush=True)
+            _configure_surus_agent(name)
+            state.update(ready=True, error="")
+        except Exception as exc:  # one agent failing must never stop Hermes from starting
+            state.update(ready=False, error=str(exc))
+            print(f"[agents] could not set up the {name} agent: {exc}", flush=True)
+    print(f"[agents] Surus agents ready: "
+          f"{', '.join(n for n, s in surus_agents_status['agents'].items() if s.get('ready')) or 'none'}",
+          flush=True)
 
 
 LOGIN_PAGE_HTML = """<!DOCTYPE html>
@@ -5156,6 +5329,8 @@ async def _initialize_hermes(mode: str = "startup"):
                 except (OSError, ValueError, ImportError) as exc:
                     # Branding is cosmetic: never block Hermes from starting over it.
                     print(f"[brand] could not apply Surus styles: {exc}", flush=True)
+                # Before the gateway starts, so its multiplexer serves the profiles.
+                await provision_surus_agents()
                 if pending:
                     _write_restore_state(None)
             if await dash.start() is False:
