@@ -1951,6 +1951,31 @@ def setup_openrouter_key() -> str:
     return ""
 
 
+# Fingerprints (sha256) of the Setup key Mercury last copied into each agent, so
+# a later restart can tell a copied key (which follows Setup when the key there
+# is replaced) from a key set in the agent itself (which is kept).
+SURUS_COPIED_KEYS_FILE = MERCURY_DIR / "agent-openrouter-keys.json"
+
+
+def _key_fingerprint(value: str) -> str:
+    return _hashlib.sha256(value.strip().encode("utf-8")).hexdigest()
+
+
+def _copied_key_fingerprints() -> dict:
+    try:
+        data = json.loads(SURUS_COPIED_KEYS_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _record_copied_key(name: str, key: str) -> None:
+    data = _copied_key_fingerprints()
+    if data.get(name) != _key_fingerprint(key):
+        data[name] = _key_fingerprint(key)
+        _atomic_write_text(SURUS_COPIED_KEYS_FILE, json.dumps(data, indent=2, sort_keys=True) + "\n")
+
+
 def hermes_api_server_key() -> str:
     """Bearer key for the default profile's API server listener (loopback only)."""
     return _persisted_secret(MERCURY_DIR / "api_server_key")
@@ -2000,26 +2025,30 @@ def _configure_surus_agent(name: str) -> None:
 
     # Keys: the profile's own API server key, and an OpenRouter key (Hermes never
     # shares credentials across profiles). A working key set in the agent itself
-    # is kept; otherwise the default profile's key is copied. A placeholder such
-    # as the template's "sk-or-..." is never copied, and one already in the
-    # agent is removed, because OpenRouter answers it with "Missing
-    # Authentication header".
+    # is kept; otherwise the Setup key is copied, and a copied key follows Setup
+    # when the key there is replaced. This runs at startup and again after every
+    # Setup save (refresh_surus_agents). A placeholder such as the template's
+    # "sk-or-..." is never copied, and one already in the agent is removed,
+    # because OpenRouter answers it with "Missing Authentication header".
     env_path = home / ".env"
     env = read_env(env_path)
     wanted = dict(env)
     if not wanted.get("API_SERVER_KEY"):
         wanted["API_SERVER_KEY"] = secrets.token_urlsafe(32)
-    own = env.get("OPENROUTER_API_KEY", "")
-    if usable_openrouter_key(own):
-        key_source = f"its own key (…{own.strip()[-4:]})"
+    own = env.get("OPENROUTER_API_KEY", "").strip()
+    shared = setup_openrouter_key()
+    own_is_copy = bool(own) and (own == shared or _key_fingerprint(own) == _copied_key_fingerprints().get(name))
+    if usable_openrouter_key(own) and not own_is_copy:
+        key_source = f"its own key (…{own[-4:]})"
+    elif shared:
+        wanted["OPENROUTER_API_KEY"] = shared
+        _record_copied_key(name, shared)
+        key_source = f"the Setup key (…{shared[-4:]})"
+    elif usable_openrouter_key(own):  # copied earlier; Setup has no key now
+        key_source = f"the Setup key it was given earlier (…{own[-4:]})"
     else:
-        shared = setup_openrouter_key()
-        if shared:
-            wanted["OPENROUTER_API_KEY"] = shared
-            key_source = f"the Setup key (…{shared[-4:]})"
-        else:
-            wanted.pop("OPENROUTER_API_KEY", None)
-            key_source = "none: set an OpenRouter key in Setup"
+        wanted.pop("OPENROUTER_API_KEY", None)
+        key_source = "none: set an OpenRouter key in Setup"
     surus_agents_status["agents"].setdefault(name, {})["openrouter_key"] = key_source
     print(f"[agents] {name}: OpenRouter key = {key_source}", flush=True)
     if wanted != env:
@@ -2082,6 +2111,13 @@ async def provision_surus_agents() -> None:
     print(f"[agents] Surus agents ready: "
           f"{', '.join(n for n, s in surus_agents_status['agents'].items() if s.get('ready')) or 'none'}",
           flush=True)
+
+
+async def refresh_surus_agents() -> None:
+    """Re-apply the agents' settings after a Setup save or restart, so an
+    OpenRouter key entered in Setup reaches them without a redeploy."""
+    async with cfg_lock:
+        await provision_surus_agents()
 
 
 LOGIN_PAGE_HTML = """<!DOCTYPE html>
@@ -3373,6 +3409,9 @@ async def api_config_put(request: Request):
             # The save is committed. A later process-start failure must not
             # roll back credentials underneath an already-started child.
             rollback_files = ()
+            # The Surus agents keep their own copy of the OpenRouter key; hand
+            # them the one just saved before Hermes restarts.
+            await refresh_surus_agents()
             if restart:
                 if not is_config_complete(merged):
                     return JSONResponse({"ok": True, "restarting": False, "warning": "Settings saved. Complete provider authorization and model selection before starting Hermes."})
@@ -3577,6 +3616,7 @@ async def api_gw_restart(request: Request):
     if err := guard(request): return err
     async with lifecycle_lock:
         if err := guard(request): return err
+        await refresh_surus_agents()
         if await gw.restart() is False:
             return JSONResponse({"error": "Hermes could not start. Check Logs."}, status_code=503)
     return JSONResponse({"ok": True})
