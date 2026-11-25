@@ -1,0 +1,14 @@
+name: surus_databricks
+version: 1.0.0
+description: Surus Enterprises — run Python/PySpark on the Surus Databricks cluster and log usage to the chatbot's Delta tables.
+author: Surus Enterprises
+provides_tools:
+  - execute_python
+  - surus_procedure
+provides_hooks:
+  - pre_llm_call
+  - post_api_request
+  - api_request_error
+  - post_tool_call
+  - post_llm_call
+  - on_session_end

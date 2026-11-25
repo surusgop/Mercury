@@ -101,6 +101,7 @@ COPY server.py /app/server.py
 COPY template_helpers/ /app/template_helpers/
 COPY templates/ /app/templates/
 COPY surus_auth/ /app/surus_auth/
+COPY hermes_plugins/ /app/hermes_plugins/
 COPY start.sh /app/start.sh
 RUN chmod +x /app/start.sh
 
