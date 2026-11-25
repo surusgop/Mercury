@@ -19,6 +19,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+SETUP_KEY = "sk-or-v1-" + "5e7" * 21 + "a1b2"      # shaped like a real OpenRouter key
+AGENT_KEY = "sk-or-v1-" + "9c4" * 21 + "c3d4"
 DATABRICKS_ENV = {"DATABRICKS_HOST": "https://adb-test.azuredatabricks.net", "DATABRICKS_TOKEN": "dapi-test"}
 _ENV_NAMES = ("DATABRICKS_HOST", "DATABRICKS_TOKEN", "DATABRICKS_CLIENT_ID", "DATABRICKS_CLIENT_SECRET",
               "SURUS_AGENT_MODEL", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "OPENROUTER_API_KEY")
@@ -30,7 +32,7 @@ class SurusAgentTests(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(self.tmp.cleanup)
         self.home = Path(self.tmp.name) / ".hermes"
         self.home.mkdir()
-        (self.home / ".env").write_text("OPENROUTER_API_KEY=sk-or-v1-test\n", encoding="utf-8")
+        (self.home / ".env").write_text(f"OPENROUTER_API_KEY={SETUP_KEY}\n", encoding="utf-8")
         self.created = []
 
     def load(self, env: dict | None = None):
@@ -103,7 +105,7 @@ class SurusAgentTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue((home / "plugins" / "surus_databricks" / "prelude" / "surus_tools.py").is_file())
             env = self.env(server, name)
             self.assertGreaterEqual(len(env["API_SERVER_KEY"]), 32)
-            self.assertEqual(env["OPENROUTER_API_KEY"], "sk-or-v1-test")
+            self.assertEqual(env["OPENROUTER_API_KEY"], SETUP_KEY)
             cfg = self.config(name)
             self.assertEqual(cfg["model"], {"provider": "openrouter", "default": "x-ai/grok-4.7"})
             self.assertEqual(cfg["platform_toolsets"],
@@ -139,6 +141,75 @@ class SurusAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(status["staff"]["ready"])
         self.assertIn("boom", status["staff"]["error"])
         self.assertTrue(status["optimizer"]["ready"])
+
+    async def test_a_working_key_set_in_the_agent_is_kept(self):
+        server = self.load(DATABRICKS_ENV)
+        await server.provision_surus_agents()
+        env_path = self.home / "profiles" / "staff" / ".env"
+        env = server.read_env(env_path)
+        env["OPENROUTER_API_KEY"] = AGENT_KEY                 # set in the agent's own Keys page
+        server.write_env(env_path, env)
+        await server.provision_surus_agents()                 # the next restart
+        self.assertEqual(self.env(server, "staff")["OPENROUTER_API_KEY"], AGENT_KEY)
+        self.assertEqual(server.surus_agents_status["agents"]["staff"]["openrouter_key"], "its own key (…c3d4)")
+        self.assertEqual(self.env(server, "optimizer")["OPENROUTER_API_KEY"], SETUP_KEY)
+
+    async def test_placeholder_keys_are_never_copied_and_are_removed(self):
+        (self.home / ".env").write_text("OPENROUTER_API_KEY=sk-or-...\n", encoding="utf-8")
+        server = self.load({**DATABRICKS_ENV, "OPENROUTER_API_KEY": "sk-or-..."})   # template Railway variable
+        staff = self.home / "profiles" / "staff"
+        staff.mkdir(parents=True)
+        (staff / "config.yaml").write_text("model: {}\n", encoding="utf-8")
+        (staff / ".env").write_text("OPENROUTER_API_KEY=sk-or-...\nAPI_SERVER_KEY=" + "k" * 40 + "\n",
+                                    encoding="utf-8")
+        await server.provision_surus_agents()
+        self.assertNotIn("OPENROUTER_API_KEY", self.env(server, "staff"))
+        self.assertNotIn("OPENROUTER_API_KEY", self.env(server, "optimizer"))
+        self.assertIn("set an OpenRouter key in Setup",
+                      server.surus_agents_status["agents"]["staff"]["openrouter_key"])
+
+    async def test_a_real_railway_key_is_used_when_setup_has_none(self):
+        (self.home / ".env").write_text("", encoding="utf-8")
+        server = self.load({**DATABRICKS_ENV, "OPENROUTER_API_KEY": AGENT_KEY})
+        await server.provision_surus_agents()
+        self.assertEqual(self.env(server, "staff")["OPENROUTER_API_KEY"], AGENT_KEY)
+
+    async def test_a_leftover_endpoint_or_key_in_the_model_block_is_cleared(self):
+        server = self.load(DATABRICKS_ENV)
+        staff = self.home / "profiles" / "staff"
+        staff.mkdir(parents=True)
+        (staff / "config.yaml").write_text(yaml.safe_dump({"model": {
+            "provider": "custom", "default": "x", "base_url": "https://openrouter.ai/api/v1",
+            "api_key": "${OPENROUTER_API_KEY}", "api_mode": "chat_completions"}}), encoding="utf-8")
+        await server.provision_surus_agents()
+        self.assertEqual(self.config("staff")["model"], {"provider": "openrouter", "default": "x-ai/grok-4.7"})
+
+    async def test_both_agents_get_the_surus_theme_and_skin(self):
+        server = self.load(DATABRICKS_ENV)
+        await server.provision_surus_agents()
+        for name in ("staff", "optimizer"):
+            home = self.home / "profiles" / name
+            self.assertTrue((home / "skins" / "surus.yaml").is_file())
+            self.assertTrue((home / "dashboard-themes" / "surus.yaml").is_file())
+            cfg = self.config(name)
+            self.assertEqual((cfg["dashboard"]["theme"], cfg["display"]["skin"]), ("surus", "surus"))
+
+    def test_placeholders_never_reach_hermes_processes(self):
+        (self.home / ".env").write_text("GITHUB_TOKEN=your_token_here\n", encoding="utf-8")
+        server = self.load({"OPENROUTER_API_KEY": "sk-or-...", "EXA_API_KEY": "exa-real-value-123"})
+        env = self._hermes_env(server)
+        self.assertNotIn("OPENROUTER_API_KEY", env)
+        self.assertNotIn("GITHUB_TOKEN", env)
+        self.assertEqual(env["EXA_API_KEY"], "exa-real-value-123")
+        (self.home / ".env").write_text(f"OPENROUTER_API_KEY={SETUP_KEY}\n", encoding="utf-8")
+        self.assertEqual(self._hermes_env(server)["OPENROUTER_API_KEY"], SETUP_KEY)
+
+    def test_key_shape_check(self):
+        server = self.load()
+        self.assertTrue(server.usable_openrouter_key(SETUP_KEY))
+        for junk in ("", "sk-or-...", "«redacted:sk-o...ab89»", "${OPENROUTER_API_KEY}", "sk-proj-" + "a" * 60,
+                     SETUP_KEY[:20], f"{SETUP_KEY} x"):
+            self.assertFalse(server.usable_openrouter_key(junk), junk)
 
     async def test_model_can_be_overridden(self):
         server = self.load({**DATABRICKS_ENV, "SURUS_AGENT_MODEL": "x-ai/grok-4.6"})
