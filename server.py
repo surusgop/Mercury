@@ -921,6 +921,20 @@ DASHBOARD_TRUST_KEYS = (
 ENV_FILE_FORBIDDEN_KEYS = DASHBOARD_KILLING_KEYS + DASHBOARD_TRUST_KEYS
 
 
+SECRET_ENV_SUFFIXES = ("_API_KEY", "_TOKEN", "_SECRET")
+_PLACEHOLDER_SECRET_RE = re.compile(
+    r"\.\.\.|^(?:your[_-].*[_-]here|<[^>]*>|x{4,}|(?:sk|sk-or|sk-ant)-x+|changeme|replace[_-]?me)$",
+    re.IGNORECASE)
+_placeholder_secrets_reported: set[str] = set()
+
+
+def looks_like_placeholder_secret(value: str | None) -> bool:
+    """True for template stand-ins such as "sk-or-..." or "your_key_here". Real
+    keys never contain "...", so nothing genuine is dropped."""
+    v = (value or "").strip()
+    return bool(v) and bool(_PLACEHOLDER_SECRET_RE.search(v))
+
+
 def build_hermes_env() -> dict[str, str]:
     """Merge OS env + HERMES_HOME + .env file contents for a hermes subprocess.
 
@@ -939,6 +953,17 @@ def build_hermes_env() -> dict[str, str]:
     env.update(read_env(ENV_FILE))
     for key in MERCURY_PRIVATE_ENV_KEYS:
         env.pop(key, None)  # Google sign-in secrets stay in this process
+    # A template placeholder ("sk-or-...", "your_key_here") in a Railway variable
+    # or .env would otherwise reach Hermes as a "key": Hermes accepts its shape,
+    # and providers reject it with confusing errors (OpenRouter: "Missing
+    # Authentication header"). Drop them so the real key, or a clear
+    # "no key" error, applies instead.
+    for key in [k for k, v in env.items() if k.endswith(SECRET_ENV_SUFFIXES) and looks_like_placeholder_secret(v)]:
+        env.pop(key)
+        if key not in _placeholder_secrets_reported:
+            _placeholder_secrets_reported.add(key)
+            print(f"[server] ignored the placeholder value of {key} (from Railway variables or .env); "
+                  "set the real value or remove the variable", flush=True)
     # The Surus Databricks plugin reads Mercury's chat records and drops log rows here.
     env["MERCURY_DIR"] = str(MERCURY_DIR)
     if surus_agents_configured():
@@ -1817,14 +1842,18 @@ SURUS_HERMES_STYLES = (
 )
 
 
-def apply_surus_hermes_styles() -> None:
-    """Install the Surus dashboard theme + skin into HERMES_HOME and activate them.
+def apply_surus_hermes_styles(home: Path | None = None) -> None:
+    """Install the Surus dashboard theme + skin into a Hermes home and activate them.
+
+    `home` defaults to the default profile (HERMES_HOME); the staff and optimizer
+    profiles get the same call, because Hermes reads each profile's own
+    `dashboard.theme`, `display.skin` and `skins/` folder.
 
     Runs under cfg_lock after preparation. Uses the same fail-closed reader and
     Hermes' atomic writer as every other config change here, and leaves a
     malformed `dashboard:` / `display:` section alone rather than replacing it.
     """
-    home = Path(HERMES_HOME)
+    home = Path(home or HERMES_HOME)
     for name, source, subdir, _ in SURUS_HERMES_STYLES:
         content = source.read_text(encoding="utf-8")
         target = home / subdir / f"{name}.yaml"
@@ -1847,7 +1876,8 @@ def apply_surus_hermes_styles() -> None:
             changed = True
     if changed:
         _write_config_atomic(config_path, config)
-        print("[brand] Surus dashboard theme and terminal skin activated", flush=True)
+        where = "" if home == Path(HERMES_HOME) else f" for the {home.name} profile"
+        print(f"[brand] Surus dashboard theme and terminal skin activated{where}", flush=True)
 
 
 # ── Surus agents: the staff and optimizer Hermes profiles ─────────────────────
@@ -1905,6 +1935,22 @@ def _persisted_secret(path: Path) -> str:
     return secret
 
 
+def usable_openrouter_key(value: str | None) -> bool:
+    """A real-looking OpenRouter key (they all start sk-or-), not a placeholder,
+    a ${VAR} reference or a redacted preview."""
+    v = (value or "").strip()
+    return (v.startswith("sk-or-") and len(v) >= 40 and "..." not in v and "${" not in v
+            and "«" not in v and not any(ch.isspace() for ch in v))
+
+
+def setup_openrouter_key() -> str:
+    """The default profile's OpenRouter key (.env from Setup, else a Railway variable)."""
+    for candidate in (read_env(ENV_FILE).get("OPENROUTER_API_KEY"), os.environ.get("OPENROUTER_API_KEY")):
+        if usable_openrouter_key(candidate):
+            return candidate.strip()
+    return ""
+
+
 def hermes_api_server_key() -> str:
     """Bearer key for the default profile's API server listener (loopback only)."""
     return _persisted_secret(MERCURY_DIR / "api_server_key")
@@ -1947,17 +1993,35 @@ def _configure_surus_agent(name: str) -> None:
     _sync_tree(SURUS_PLUGIN_SRC, home / "plugins" / SURUS_PLUGIN_NAME)
     workdir = MERCURY_DIR / "agents" / name
     workdir.mkdir(parents=True, exist_ok=True)
+    try:
+        apply_surus_hermes_styles(home)
+    except (OSError, ValueError, ImportError) as exc:  # cosmetic: never block the agent
+        print(f"[brand] could not apply Surus styles to the {name} profile: {exc}", flush=True)
 
-    # Keys: the profile's own API server key, and the OpenRouter key from the
-    # default profile (Hermes never shares credentials across profiles).
+    # Keys: the profile's own API server key, and an OpenRouter key (Hermes never
+    # shares credentials across profiles). A working key set in the agent itself
+    # is kept; otherwise the default profile's key is copied. A placeholder such
+    # as the template's "sk-or-..." is never copied, and one already in the
+    # agent is removed, because OpenRouter answers it with "Missing
+    # Authentication header".
     env_path = home / ".env"
     env = read_env(env_path)
     wanted = dict(env)
     if not wanted.get("API_SERVER_KEY"):
         wanted["API_SERVER_KEY"] = secrets.token_urlsafe(32)
-    openrouter = read_env(ENV_FILE).get("OPENROUTER_API_KEY") or os.environ.get("OPENROUTER_API_KEY", "")
-    if openrouter:
-        wanted["OPENROUTER_API_KEY"] = openrouter
+    own = env.get("OPENROUTER_API_KEY", "")
+    if usable_openrouter_key(own):
+        key_source = f"its own key (…{own.strip()[-4:]})"
+    else:
+        shared = setup_openrouter_key()
+        if shared:
+            wanted["OPENROUTER_API_KEY"] = shared
+            key_source = f"the Setup key (…{shared[-4:]})"
+        else:
+            wanted.pop("OPENROUTER_API_KEY", None)
+            key_source = "none: set an OpenRouter key in Setup"
+    surus_agents_status["agents"].setdefault(name, {})["openrouter_key"] = key_source
+    print(f"[agents] {name}: OpenRouter key = {key_source}", flush=True)
     if wanted != env:
         write_env(env_path, wanted)
 
@@ -1965,6 +2029,10 @@ def _configure_surus_agent(name: str) -> None:
     config = _read_config_for_write(config_path)
     before = json.dumps(config, sort_keys=True, default=str)
     model = config.get("model") if isinstance(config.get("model"), dict) else {}
+    # Plain OpenRouter: an endpoint or key left in the model block by an earlier
+    # setup in the agent would override the .env key, so drop them.
+    for stale in ("base_url", "api_key", "api", "api_mode"):
+        model.pop(stale, None)
     model.update({"provider": "openrouter", "default": surus_agent_model()})
     config["model"] = model
     platform_toolsets = config.get("platform_toolsets") if isinstance(config.get("platform_toolsets"), dict) else {}
