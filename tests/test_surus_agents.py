@@ -168,6 +168,58 @@ class SurusAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("set an OpenRouter key in Setup",
                       server.surus_agents_status["agents"]["staff"]["openrouter_key"])
 
+    async def test_a_key_saved_in_setup_after_startup_reaches_the_agents(self):
+        (self.home / ".env").write_text("", encoding="utf-8")       # a fresh deploy: no key yet
+        (self.home / "config.yaml").write_text("model: {}\n", encoding="utf-8")
+        server = self.load(DATABRICKS_ENV)
+        await server.provision_surus_agents()                        # startup
+        self.assertNotIn("OPENROUTER_API_KEY", self.env(server, "staff"))
+        server.guard = lambda _: None
+
+        class Request:
+            async def json(self):
+                return {"vars": {"OPENROUTER_API_KEY": SETUP_KEY}, "_restart": False}
+
+        response = await server.api_config_put(Request())             # the admin saves Setup
+        self.assertEqual(response.status_code, 200)
+        for name in ("staff", "optimizer"):
+            self.assertEqual(self.env(server, name)["OPENROUTER_API_KEY"], SETUP_KEY)
+        self.assertEqual(server.surus_agents_status["agents"]["staff"]["openrouter_key"],
+                         "the Setup key (…a1b2)")
+
+    async def test_a_copied_key_follows_setup_and_an_own_key_stays(self):
+        server = self.load(DATABRICKS_ENV)
+        await server.provision_surus_agents()
+        env_path = self.home / "profiles" / "optimizer" / ".env"
+        env = server.read_env(env_path)
+        env["OPENROUTER_API_KEY"] = AGENT_KEY                         # set in the optimizer itself
+        server.write_env(env_path, env)
+        new_key = "sk-or-v1-" + "7d1" * 21 + "e5f6"
+        (self.home / ".env").write_text(f"OPENROUTER_API_KEY={new_key}\n", encoding="utf-8")  # key replaced
+        await server.refresh_surus_agents()
+        self.assertEqual(self.env(server, "staff")["OPENROUTER_API_KEY"], new_key)
+        self.assertEqual(self.env(server, "optimizer")["OPENROUTER_API_KEY"], AGENT_KEY)
+
+    async def test_a_key_copied_before_fingerprints_existed_follows_setup(self):
+        server = self.load(DATABRICKS_ENV)
+        staff = self.home / "profiles" / "staff"
+        staff.mkdir(parents=True)
+        (staff / "config.yaml").write_text("model: {}\n", encoding="utf-8")
+        (staff / ".env").write_text(f"OPENROUTER_API_KEY={SETUP_KEY}\n", encoding="utf-8")  # an older Mercury's copy
+        await server.provision_surus_agents()
+        new_key = "sk-or-v1-" + "7d1" * 21 + "e5f6"
+        (self.home / ".env").write_text(f"OPENROUTER_API_KEY={new_key}\n", encoding="utf-8")
+        await server.provision_surus_agents()
+        self.assertEqual(self.env(server, "staff")["OPENROUTER_API_KEY"], new_key)
+
+    async def test_a_copied_key_is_kept_when_setup_no_longer_has_one(self):
+        server = self.load(DATABRICKS_ENV)
+        await server.provision_surus_agents()
+        (self.home / ".env").write_text("", encoding="utf-8")
+        await server.provision_surus_agents()
+        self.assertEqual(self.env(server, "staff")["OPENROUTER_API_KEY"], SETUP_KEY)
+        self.assertIn("given earlier", server.surus_agents_status["agents"]["staff"]["openrouter_key"])
+
     async def test_a_real_railway_key_is_used_when_setup_has_none(self):
         (self.home / ".env").write_text("", encoding="utf-8")
         server = self.load({**DATABRICKS_ENV, "OPENROUTER_API_KEY": AGENT_KEY})
