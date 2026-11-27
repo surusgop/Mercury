@@ -98,6 +98,7 @@ ENV PATH="/opt/hermes/bin:/opt/hermes/wrapper-venv/bin:${PATH}" \
     HERMES_TUI_DIR=/opt/hermes/ui-tui
 RUN mkdir -p /data/.hermes
 COPY server.py /app/server.py
+COPY mercury_chat.py /app/mercury_chat.py
 COPY template_helpers/ /app/template_helpers/
 COPY templates/ /app/templates/
 COPY surus_auth/ /app/surus_auth/

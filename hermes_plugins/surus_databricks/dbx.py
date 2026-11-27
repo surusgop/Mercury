@@ -161,6 +161,13 @@ class DatabricksClient:
     def download(self, path: str) -> bytes:
         return self.request("GET", "/api/2.0/fs/files" + self._fs_path(path), raw=True)
 
+    def file_url(self, path: str) -> tuple[str, dict]:
+        """URL and auth header for downloading a Volume file with another (streaming) client."""
+        return f"{self.host}/api/2.0/fs/files{self._fs_path(path)}", {"Authorization": f"Bearer {self._bearer()}"}
+
+    def close(self) -> None:
+        self._http.close()
+
     def upload(self, path: str, data: bytes) -> None:
         self.request("PUT", "/api/2.0/fs/files" + self._fs_path(path),
                      params={"overwrite": "true"}, content=data)

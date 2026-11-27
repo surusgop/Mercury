@@ -281,6 +281,7 @@ class SurusAgentTests(unittest.IsolatedAsyncioTestCase):
                          ("true", "127.0.0.1", "8642"))
         self.assertGreaterEqual(len(env["API_SERVER_KEY"]), 32)
         self.assertTrue(env["MERCURY_DIR"].endswith(".mercury"))
+        self.assertEqual(env["GATEWAY_MULTIPLEX_PROFILES"], "true")  # /p/<profile>/ for the /ask chat
         off = self._hermes_env(self.load())
         self.assertNotIn("API_SERVER_ENABLED", off)
         self.assertIn("MERCURY_DIR", off)

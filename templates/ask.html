@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mercury · Surus Enterprises</title>
+<link rel="icon" type="image/png" href="/setup/brand/surus-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
+<script>
+  (function () {  // theme before first paint: saved choice, else the system's
+    var saved = null;
+    try { saved = localStorage.getItem('mercury.theme'); } catch (e) {}
+    var dark = saved ? saved === 'dark' : !!(window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  })();
+</script>
+<style>
+:root{
+  --bg:#F5F7F9;--surface:#FFFFFF;--surface-2:#EDF0F3;--line:#DFE4E9;--line-strong:#C3CAD3;
+  --text:#232932;--text-2:#333B46;--muted:#6B7684;--ink:#0F1216;
+  --red:#C3262F;--red-2:#A81F27;--red-3:#8A181F;--red-tint:#FBECEB;--red-line:#EFC2C4;
+  --error:#B3261E;--ok:#1E7A4C;--focus:rgba(195,38,47,.35);--code-bg:#F3F5F8;--user:#E9EDF1;
+  --shadow:0 1px 2px rgba(15,18,22,.06),0 1px 1px rgba(15,18,22,.04);
+  --top:#0F1216;--top-line:#0F1216;
+  --ease:cubic-bezier(.2,.6,.2,1);
+  color-scheme:light;
+}
+[data-theme="dark"]{
+  --bg:#0F1216;--surface:#161A20;--surface-2:#1E242C;--line:#2A313B;--line-strong:#3A434F;
+  --text:#E6E9ED;--text-2:#C9CFD6;--muted:#98A2AF;--ink:#F5F7F9;
+  --red:#E0444C;--red-2:#C3262F;--red-3:#A81F27;--red-tint:#2A1517;--red-line:#5C2327;
+  --error:#F28B82;--ok:#6CC59A;--focus:rgba(224,68,76,.45);--code-bg:#12161B;--user:#232A33;
+  --shadow:0 1px 2px rgba(0,0,0,.4);
+  --top:#0A0C0F;--top-line:#1E242C;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font:400 15px/1.55 'IBM Plex Sans','Helvetica Neue',Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;display:flex;flex-direction:column;overflow:hidden}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0}
+a{color:var(--red-2)}
+[data-theme="dark"] .answer a,[data-theme="dark"] .help-body a{color:#F07A80}
+:focus-visible{outline:none;box-shadow:0 0 0 3px var(--focus);border-radius:6px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ── top bar ── */
+.top{height:56px;flex:none;display:flex;align-items:center;gap:16px;padding:0 16px 0 20px;background:var(--top);
+  color:#fff;border-bottom:1px solid var(--top-line)}
+.menu-btn{display:none;width:36px;height:36px;border-radius:6px;color:#fff;align-items:center;justify-content:center}
+.menu-btn:hover{background:rgba(255,255,255,.08)}
+.lockup{display:inline-flex;align-items:center;gap:12px;color:#fff;text-decoration:none}
+.lockup img{height:30px;width:auto;display:block}
+.wm{display:grid;gap:1px;line-height:1}
+.wm span:first-child{font:900 16.2px/1 Montserrat,Arial,sans-serif;letter-spacing:.02em;text-transform:uppercase}
+.wm span:last-child{font:700 6.5px/1 Montserrat,Arial,sans-serif;letter-spacing:.89px;text-transform:uppercase;opacity:.85}
+.product{font:700 11px/1 'IBM Plex Sans',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#C3CAD3;
+  padding-left:16px;border-left:1px solid rgba(255,255,255,.18)}
+.top-right{margin-left:auto;display:flex;align-items:center;gap:6px;min-width:0}
+.top-btn,.top-link{height:32px;padding:0 10px;border-radius:6px;display:inline-flex;align-items:center;gap:6px;
+  color:#fff;text-decoration:none;font:600 11px/1 'IBM Plex Sans',sans-serif;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.top-btn:hover,.top-link:hover{background:rgba(255,255,255,.08)}
+.who{font:500 12px/1 'IBM Plex Sans',sans-serif;color:#C3CAD3;padding:0 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px}
+
+/* ── layout ── */
+.shell{flex:1;display:flex;min-height:0}
+.side{width:280px;flex:none;display:flex;flex-direction:column;gap:12px;padding:16px 12px;background:var(--surface);
+  border-right:1px solid var(--line);min-height:0}
+.main{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}
+.scrim{display:none}
+
+.btn{height:36px;padding:0 14px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  font:600 12px/1 'IBM Plex Sans',sans-serif;letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--line-strong);
+  background:var(--surface);color:var(--text);transition:background-color 120ms var(--ease),border-color 120ms var(--ease)}
+.btn:hover{background:var(--surface-2)}
+.btn.primary{background:var(--red-2);border-color:var(--red-3);color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.10)}
+.btn.primary:hover{background:var(--red-3)}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.new-chat{width:100%}
+.picker{display:grid;gap:6px}
+.picker label{font:600 11px/1.3 'IBM Plex Sans',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:0 4px}
+.picker select{height:36px;padding:0 10px;border:1px solid var(--line-strong);border-radius:6px;background:var(--surface);
+  font:500 13px/1 'IBM Plex Sans',sans-serif}
+.side-title{font:700 11px/1.3 'IBM Plex Sans',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);
+  padding:8px 4px 0}
+.recents{list-style:none;overflow-y:auto;flex:1;min-height:0;margin:0 -4px;padding:0 4px}
+.recent{border-radius:6px;margin-bottom:2px}
+.recent.active{background:var(--surface-2)}
+.recent-open{width:100%;text-align:left;display:grid;gap:2px;padding:8px 10px;border-radius:6px}
+.recent:not(.active) .recent-open:hover{background:var(--surface-2)}
+.recent-title{font:500 13.5px/1.35 'IBM Plex Sans',sans-serif;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.recent-sub{font:400 11.5px/1.3 'IBM Plex Sans',sans-serif;color:var(--muted);display:flex;align-items:center;gap:6px}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--red);animation:pulse 1.4s ease-in-out infinite}
+.recent-actions{display:flex;gap:4px;padding:0 6px 8px}
+.link-btn{height:26px;padding:0 8px;border-radius:5px;font:600 11px/1 'IBM Plex Sans',sans-serif;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--muted)}
+.link-btn:hover{background:var(--bg);color:var(--text)}
+.link-btn.danger:hover{color:var(--error)}
+.rename-input{width:100%;height:32px;padding:0 8px;border:1px solid var(--red);border-radius:6px;background:var(--surface);
+  font:500 13.5px/1 'IBM Plex Sans',sans-serif;box-shadow:0 0 0 3px var(--focus);outline:none}
+.empty-recents{color:var(--muted);font-size:13px;padding:4px}
+
+/* ── thread ── */
+.notice{margin:12px auto 0;width:min(820px,calc(100% - 32px));padding:10px 12px;border-radius:8px;
+  background:var(--red-tint);border:1px solid var(--red-line);color:var(--error);font:500 13px/1.45 'IBM Plex Sans',sans-serif}
+.thread{flex:1;overflow-y:auto;min-height:0;padding:24px 16px 8px}
+.thread-inner{max-width:820px;margin:0 auto}
+.welcome{padding:48px 0 24px}
+.eyebrow{font:700 11px/1.35 'IBM Plex Sans',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.welcome h1{font:800 28px/1.15 Montserrat,'Helvetica Neue',Arial,sans-serif;letter-spacing:-.01em;color:var(--ink);margin:8px 0 8px}
+.welcome p{color:var(--text-2);max-width:620px}
+.samples{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
+.sample{padding:8px 12px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);color:var(--text-2);
+  font:500 13px/1.35 'IBM Plex Sans',sans-serif;text-align:left}
+.sample:hover{border-color:var(--line-strong);color:var(--text)}
+
+.ex{padding:8px 0 20px}
+.user{display:flex;justify-content:flex-end;margin-bottom:14px}
+.user-bubble{max-width:min(640px,88%);background:var(--user);border-radius:14px 14px 4px 14px;padding:10px 14px;
+  white-space:pre-wrap;word-wrap:break-word;color:var(--text)}
+.bot{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}  /* wide tables and code scroll inside, never widen the page */
+.steps{border:1px solid var(--line);border-radius:8px;background:var(--surface);overflow:hidden}
+.steps>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:9px 12px;
+  font:600 12px/1.3 'IBM Plex Sans',sans-serif;letter-spacing:.04em;color:var(--text-2)}
+.steps>summary::-webkit-details-marker{display:none}
+.steps>summary::before{content:"";width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;
+  transform:rotate(-45deg);transition:transform 120ms var(--ease);margin:0 2px}
+.steps[open]>summary::before{transform:rotate(45deg)}
+.steps-count{color:var(--muted);font-weight:500}
+.step-list{list-style:none;border-top:1px solid var(--line);padding:4px 12px 10px}
+.step{padding:8px 0}
+.step+.step{border-top:1px dashed var(--line)}
+.step-head{display:flex;align-items:center;gap:8px;font:600 11.5px/1.3 'IBM Plex Sans',sans-serif;letter-spacing:.04em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.step-state{font-weight:500;text-transform:none;letter-spacing:0}
+.step-dot{width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.step.running .step-dot{background:var(--red);animation:pulse 1.4s ease-in-out infinite}
+.step.error .step-dot{background:var(--error)}
+.step.stopped .step-dot{background:var(--muted)}
+.step.note{font-size:14px;color:var(--text-2)}
+pre.code{background:var(--code-bg);border:1px solid var(--line);border-radius:6px;padding:10px 12px;overflow:auto;max-height:340px;
+  font:400 12.5px/1.5 'IBM Plex Mono',ui-monospace,monospace;color:var(--text);white-space:pre}
+.out{margin-top:6px}
+.out>summary{cursor:pointer;font:500 12px/1.3 'IBM Plex Sans',sans-serif;color:var(--muted)}
+.out pre{margin-top:6px;max-height:260px}
+
+.answer{color:var(--text);overflow-wrap:anywhere}
+.answer>*+*{margin-top:10px}
+.answer h3,.answer h4,.answer h5,.answer h6{font:700 16px/1.3 'IBM Plex Sans',sans-serif;color:var(--ink);margin-top:16px}
+.answer ul,.answer ol{padding-left:22px}
+.answer li+li{margin-top:3px}
+.answer code{font:400 .88em/1 'IBM Plex Mono',ui-monospace,monospace;background:var(--surface-2);padding:1px 5px;border-radius:4px}
+.answer pre code{background:none;padding:0;font-size:12.5px;line-height:1.5}
+.answer blockquote{border-left:3px solid var(--line-strong);padding-left:12px;color:var(--text-2)}
+.answer hr{border:0;border-top:1px solid var(--line)}
+.table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.answer table{border-collapse:collapse;width:100%;font-size:13.5px;font-variant-numeric:tabular-nums}
+.answer th,.answer td{padding:7px 12px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+.answer th{font:600 12px/1.3 'IBM Plex Sans',sans-serif;letter-spacing:.04em;color:var(--text-2);background:var(--surface-2)}
+.answer tr:last-child td{border-bottom:0}
+.cursor{display:inline-block;width:7px;height:1.05em;vertical-align:text-bottom;background:var(--red);margin-left:2px;animation:blink 1s steps(2) infinite}
+.working{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13.5px}
+.spinner{width:14px;height:14px;border:2px solid var(--line-strong);border-top-color:var(--red);border-radius:50%;animation:spin .8s linear infinite}
+.hint{color:var(--muted);font-size:13px}
+.err-box{padding:10px 12px;border-radius:8px;background:var(--red-tint);border:1px solid var(--red-line);color:var(--error);font-size:13.5px}
+.stopped-note{color:var(--muted);font-size:13.5px;font-style:italic}
+.meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:var(--muted);font:400 12px/1.4 'IBM Plex Sans',sans-serif}
+.meta-text{margin-right:6px}
+.rate{width:30px;height:28px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;color:var(--muted)}
+.rate:hover{background:var(--surface-2);color:var(--text)}
+.rate[aria-pressed="true"]{color:var(--red);background:var(--red-tint)}
+.rate svg{width:16px;height:16px}
+
+/* ── files + composer ── */
+.files{width:min(820px,calc(100% - 32px));margin:0 auto 8px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;
+  background:var(--surface);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.files-title{font:700 11px/1.3 'IBM Plex Sans',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-right:4px}
+.file{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:6px;border:1px solid var(--line-strong);
+  text-decoration:none;color:var(--text);font:500 13px/1 'IBM Plex Sans',sans-serif;background:var(--surface)}
+.file:hover{background:var(--surface-2)}
+[data-theme="dark"] .file{color:var(--text)}
+.file small{color:var(--muted);font-size:11.5px}
+.file svg{width:14px;height:14px;color:var(--red)}
+.composer-wrap{flex:none;padding:0 16px 14px}
+.composer{max-width:820px;margin:0 auto;display:flex;align-items:flex-end;gap:8px;padding:8px 8px 8px 14px;background:var(--surface);
+  border:1px solid var(--line-strong);border-radius:12px;box-shadow:var(--shadow);transition:border-color 120ms var(--ease),box-shadow 120ms var(--ease)}
+.composer:focus-within{border-color:var(--red);box-shadow:0 0 0 3px var(--focus)}
+.composer textarea{flex:1;resize:none;border:0;outline:none;background:transparent;min-height:24px;max-height:200px;
+  padding:6px 0;font:400 15px/1.5 'IBM Plex Sans',sans-serif}
+.composer textarea:focus-visible{box-shadow:none}
+.send,.stop{width:38px;height:38px;flex:none;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;color:#fff}
+.send{background:var(--red-2)}
+.send:hover{background:var(--red-3)}
+.send:disabled{background:var(--line-strong);cursor:not-allowed}
+.stop{background:var(--ink);color:var(--bg)}
+.send svg,.stop svg{width:18px;height:18px}
+.composer-hint{max-width:820px;margin:6px auto 0;color:var(--muted);font-size:12px;text-align:center}
+
+/* ── help ── */
+dialog.help{border:1px solid var(--line);border-top:3px solid var(--red);border-radius:8px;background:var(--surface);color:var(--text);
+  width:min(720px,calc(100% - 32px));max-height:min(86vh,900px);padding:0;box-shadow:0 12px 40px rgba(15,18,22,.25);margin:auto}
+dialog.help::backdrop{background:rgba(15,18,22,.45)}
+.help-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line)}
+.help-head h2{font:800 20px/1.2 Montserrat,Arial,sans-serif;color:var(--ink)}
+.help-body{padding:4px 20px 20px;overflow-y:auto;max-height:calc(min(86vh,900px) - 64px)}
+.help-body h3{font:700 15px/1.3 'IBM Plex Sans',sans-serif;color:var(--ink);margin:18px 0 6px}
+.help-body p,.help-body li{color:var(--text-2);font-size:14px}
+.help-body ul{padding-left:20px}
+.help-body li+li{margin-top:4px}
+.help-body table{border-collapse:collapse;width:100%;font-size:13.5px;margin-top:6px}
+.help-body td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top;color:var(--text-2)}
+.help-body td:first-child{white-space:nowrap;font-weight:600;color:var(--text)}
+.x-btn{width:32px;height:32px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;color:var(--muted)}
+.x-btn:hover{background:var(--surface-2);color:var(--text)}
+
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes blink{to{visibility:hidden}}
+@media (prefers-reduced-motion:reduce){.spinner,.live-dot,.step.running .step-dot,.cursor{animation:none}}
+
+/* ── narrow screens ── */
+@media (max-width:820px){
+  .menu-btn{display:inline-flex}
+  .product,.who,.top-link:not(.signout),.top-btn .label{display:none}
+  .top{padding:0 8px}
+  .side{position:fixed;top:56px;bottom:0;left:0;z-index:20;transform:translateX(-100%);transition:transform 160ms var(--ease);
+    box-shadow:0 0 24px rgba(15,18,22,.25)}
+  body.side-open .side{transform:none}
+  body.side-open .scrim{display:block;position:fixed;inset:56px 0 0 0;background:rgba(15,18,22,.35);z-index:10}
+  .thread{padding:16px 16px 8px}
+  .welcome{padding-top:20px}
+  .welcome h1{font-size:23px}
+  .answer th,.answer td{white-space:normal}
+}
+</style>
+</head>
+<body>
+<script type="application/json" id="boot">__BOOT_JSON__</script>
+<header class="top">
+  <button class="menu-btn" id="menu-btn" aria-label="Show chats" aria-expanded="false">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+  </button>
+  <a class="lockup" href="/ask"><img src="/setup/brand/surus-icon-white.png" alt=""><span class="wm"><span>Surus</span><span>Enterprises</span></span></a>
+  <span class="product">Mercury</span>
+  <div class="top-right">
+    <button class="top-btn" id="help-btn" aria-haspopup="dialog"><span aria-hidden="true">?</span><span class="label">Help</span></button>
+    <button class="top-btn" id="theme-btn" aria-label="Switch between light and dark"><span aria-hidden="true">◐</span><span class="label">Theme</span></button>
+    <span class="who" title="__EMAIL__">__EMAIL__</span>
+    __ADMIN_LINKS__
+    <a class="top-link signout" href="/logout">Sign out</a>
+  </div>
+</header>
+
+<div class="shell">
+  <aside class="side" id="side" aria-label="Chats">
+    <button class="btn primary new-chat" id="new-chat"><span aria-hidden="true">＋</span> New chat</button>
+    <div class="picker" id="picker" hidden>
+      <label for="agent-select">Assistant</label>
+      <select id="agent-select"></select>
+    </div>
+    <div class="side-title">Recents</div>
+    <ul class="recents" id="recents"></ul>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <main class="main">
+    <div class="notice" id="notice" role="status" hidden></div>
+    <div class="thread" id="thread" aria-live="polite"><div class="thread-inner" id="thread-inner"></div></div>
+    <div class="files" id="files" hidden></div>
+    <div class="composer-wrap">
+      <form class="composer" id="composer">
+        <label class="sr" for="input">Ask a question</label>
+        <textarea id="input" rows="1" placeholder="Ask about the voter file…" autocomplete="off"></textarea>
+        <button type="submit" class="send" id="send" aria-label="Send" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        </button>
+        <button type="button" class="stop" id="stop" aria-label="Stop" hidden>
+          <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+        </button>
+      </form>
+      <p class="composer-hint">Enter sends · Shift+Enter adds a line · Answers can be wrong: check numbers that matter.</p>
+    </div>
+  </main>
+</div>
+
+<dialog class="help" id="help" aria-labelledby="help-title">
+  <div class="help-head">
+    <h2 id="help-title">Using Mercury</h2>
+    <button class="x-btn" id="help-close" aria-label="Close help">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+  <div class="help-body">
+    <p style="margin-top:14px">Mercury answers plain-English questions about the voter file. Type a question and press <b>Enter</b>. It looks up the data on Databricks and writes the answer.</p>
+
+    <h3>Asking questions about the voter file</h3>
+    <ul>
+      <li><b>What's covered:</b> the Illinois, Wisconsin and Michigan voter files, ballot history back to 2012, and Illinois precinct results for the 2020, 2022 and 2024 general elections.</li>
+      <li><b>Everyday words work:</b> <i>Republican</i> → Conservative, <i>Democrat</i> → Liberal, <i>Unreliable voter</i> → Turnout voter, <i>Base Republican</i> → Base Conservative.</li>
+      <li><b>Follow-ups work:</b> the chat remembers what came before, so <i>"now break that down by county"</i> works.</li>
+      <li><b>Name the state.</b> Answers come back faster and more accurately.</li>
+      <li>It's built for totals and breakdowns, not for looking up one person.</li>
+    </ul>
+
+    <h3>Example questions</h3>
+    <p>On a new chat, the grey buttons under the heading are ready-made questions. Click one to put it in the box, edit it if you like, then press Enter. More to try:</p>
+    <ul>
+      <li><i>How many voters in Wisconsin voted by mail in the 2022 general election?</i></li>
+      <li><i>Who won the 2024 governor race in Cook County, precinct by precinct?</i></li>
+      <li><i>Show me the top 10 zip codes in Illinois by number of registered voters.</i></li>
+    </ul>
+
+    <h3>Getting a spreadsheet</h3>
+    <p>Ask for it: <i>"give me that as a CSV."</i> The file appears under <b>Files from this chat</b> above the message box. Click it to download, then open it in Excel or Google Sheets.</p>
+
+    <h3>Your chats</h3>
+    <ul>
+      <li>Your chats are private: only you can see them. Every chat is saved and listed under <b>Recents</b>.</li>
+      <li>Click a chat to reopen it, then keep asking. Select it to <b>Rename</b> or <b>Delete</b> it.</li>
+      <li>Long questions keep running if you switch tabs, close the tab or reload. Come back to the chat to see the answer.</li>
+    </ul>
+
+    <h3>Buttons and controls</h3>
+    <table>
+      <tr><td>＋ New chat</td><td>Starts a fresh conversation.</td></tr>
+      <tr><td>Recents</td><td>Your saved chats. Click one to reopen it.</td></tr>
+      <tr><td>↑</td><td>Sends your message. Enter works too.</td></tr>
+      <tr><td>■ Stop</td><td>Shows while it's working. Click to cancel the question.</td></tr>
+      <tr><td>Python code executed</td><td>The steps it ran on Databricks to get the answer. Optional to open.</td></tr>
+      <tr><td>👍 / 👎</td><td>Tell us whether an answer was right. We review every rating.</td></tr>
+      <tr><td>◐ Theme</td><td>Switches between light and dark.</td></tr>
+    </table>
+    <p style="margin-top:8px">The grey line under a reply shows which model answered, how many steps it ran, how long it took and roughly what it cost.</p>
+
+    <h3>Troubleshooting</h3>
+    <ul>
+      <li><b>Slow?</b> Most questions take 10–30 seconds. The first question of the day can take a few minutes while the Databricks cluster starts.</li>
+      <li><b>Something went wrong?</b> Your chat is saved, so ask again or reword it.</li>
+      <li><b>Answer looks off?</b> Ask <i>"can you double-check that?"</i> or <i>"show me the raw numbers."</i></li>
+      <li><b>Still stuck?</b> Contact the Surus tech team.</li>
+    </ul>
+  </div>
+</dialog>
+
+<script>
+(function () {
+'use strict';
+
+const BOOT = JSON.parse(document.getElementById('boot').textContent);
+const $ = (id) => document.getElementById(id);
+const els = {
+  thread: $('thread'), inner: $('thread-inner'), recents: $('recents'), input: $('input'), send: $('send'), stop: $('stop'),
+  composer: $('composer'), notice: $('notice'), files: $('files'), picker: $('picker'), select: $('agent-select'),
+  help: $('help'),
+};
+const S = {
+  agents: [], agent: 'staff', chats: [], chat: null, exchanges: [], live: null,
+  run: null, busy: false, renaming: null, ticker: null,
+};
+
+// ── utilities ────────────────────────────────────────────────────────────────
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+  del(k) { try { localStorage.removeItem(k); } catch (e) {} },
+};
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+class ApiError extends Error { constructor(msg, status) { super(msg); this.status = status; } }
+async function api(method, path, body) {
+  const opts = { method, credentials: 'same-origin', redirect: 'manual', headers: { Accept: 'application/json' } };
+  if (body !== undefined) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+  let res;
+  try { res = await fetch(path, opts); } catch (e) { throw new ApiError('Mercury could not be reached. Check your connection.', 0); }
+  if (res.type === 'opaqueredirect' || res.status === 401) {
+    location.reload();  // the sign-in expired: Google signs you in again
+    throw new ApiError('Signing you in again…', 401);
+  }
+  let data = {};
+  try { data = await res.json(); } catch (e) {}
+  if (!res.ok) throw new ApiError(data.error || `Something went wrong (HTTP ${res.status}).`, res.status);
+  return data;
+}
+function ago(ts) {
+  const s = Date.now() / 1000 - ts;
+  if (s < 60) return 'Just now';
+  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
+  if (s < 172800) return 'Yesterday';
+  return new Date(ts * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+function fmtDuration(ms) {
+  const s = Math.round(ms / 1000);
+  return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s`;
+}
+function fmtCost(c) {
+  if (c == null) return '';
+  if (c === 0) return '$0.00';
+  return c < 0.01 ? `$${c.toFixed(4)}` : `$${c.toFixed(2)}`;
+}
+function fmtSize(n) {
+  if (n == null) return '';
+  if (n < 1024) return `${n} B`;
+  if (n < 1048576) return `${(n / 1024).toFixed(0)} KB`;
+  return `${(n / 1048576).toFixed(1)} MB`;
+}
+const shortModel = (m) => String(m || '').split('/').pop();
+
+// ── a small, safe Markdown renderer (everything is escaped first) ────────────
+function inline(s) {
+  const codes = [];
+  let h = esc(s).replace(/`([^`]+)`/g, (m, c) => { codes.push(c); return `\u0000${codes.length - 1}\u0000`; });
+  h = h.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^*\w])\*(?!\s)([^*\n]+?)\*(?!\*)/g, '$1<em>$2</em>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  return h.replace(/\u0000(\d+)\u0000/g, (m, i) => `<code>${codes[+i]}</code>`);
+}
+const LIST_RE = /^\s*([-*+]|\d+[.)])\s+/;
+const isTableSep = (l) => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(l);
+const cells = (l) => l.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
+function md(src) {
+  const lines = String(src || '').replace(/\r\n?/g, '\n').split('\n');
+  const out = [];
+  let i = 0;
+  const startsBlock = (j) => /^\s*(```|#{1,6}\s|>)/.test(lines[j]) || LIST_RE.test(lines[j])
+    || (lines[j].includes('|') && j + 1 < lines.length && isTableSep(lines[j + 1]));
+  while (i < lines.length) {
+    const line = lines[i];
+    let m;
+    if (/^\s*```/.test(line)) {
+      const buf = [];
+      i++;
+      while (i < lines.length && !/^\s*```/.test(lines[i])) buf.push(lines[i++]);
+      i++;
+      out.push(`<pre class="code"><code>${esc(buf.join('\n'))}</code></pre>`);
+    } else if (!line.trim()) {
+      i++;
+    } else if ((m = line.match(/^(#{1,6})\s+(.*)$/))) {
+      const level = Math.min(m[1].length + 2, 6);
+      out.push(`<h${level}>${inline(m[2])}</h${level}>`);
+      i++;
+    } else if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
+      out.push('<hr>');
+      i++;
+    } else if (line.includes('|') && i + 1 < lines.length && isTableSep(lines[i + 1])) {
+      const head = cells(line);
+      const align = cells(lines[i + 1]).map((c) => (/^:-+:$/.test(c) ? 'center' : /-:$/.test(c) ? 'right' : ''));
+      const cell = (tag, c, j) => `<${tag}${align[j] ? ` style="text-align:${align[j]}"` : ''}>${inline(c)}</${tag}>`;
+      const rows = [];
+      i += 2;
+      while (i < lines.length && lines[i].includes('|') && lines[i].trim()) rows.push(cells(lines[i++]));
+      out.push('<div class="table-wrap"><table><thead><tr>' + head.map((c, j) => cell('th', c, j)).join('')
+        + '</tr></thead><tbody>' + rows.map((r) => '<tr>' + r.map((c, j) => cell('td', c, j)).join('') + '</tr>').join('')
+        + '</tbody></table></div>');
+    } else if (/^\s*>/.test(line)) {
+      const buf = [];
+      while (i < lines.length && /^\s*>/.test(lines[i])) buf.push(lines[i++].replace(/^\s*>\s?/, ''));
+      out.push(`<blockquote>${md(buf.join('\n'))}</blockquote>`);
+    } else if (LIST_RE.test(line)) {
+      const ordered = /^\s*\d+[.)]\s+/.test(line);
+      const sameList = (l) => LIST_RE.test(l) && (/^\s{2,}/.test(l) || /^\s*\d+[.)]\s+/.test(l) === ordered);
+      const items = [];
+      while (i < lines.length && sameList(lines[i])) {
+        let item = lines[i++].replace(LIST_RE, '');
+        while (i < lines.length && /^\s{2,}\S/.test(lines[i]) && !LIST_RE.test(lines[i])) item += ' ' + lines[i++].trim();
+        items.push(`<li>${inline(item)}</li>`);
+      }
+      out.push(ordered ? `<ol>${items.join('')}</ol>` : `<ul>${items.join('')}</ul>`);
+    } else {
+      const buf = [];
+      while (i < lines.length && lines[i].trim() && !(buf.length && startsBlock(i))) buf.push(lines[i++]);
+      out.push(`<p>${buf.map(inline).join('<br>')}</p>`);
+    }
+  }
+  return out.join('');
+}
+
+// ── assistants ───────────────────────────────────────────────────────────────
+const agentById = (id) => S.agents.find((a) => a.id === id);
+const currentAgent = () => agentById(S.chat ? S.chat.agent : S.agent);
+function renderPicker() {
+  const show = S.agents.length > 1;
+  els.picker.hidden = !show;
+  if (!show) return;
+  els.select.innerHTML = S.agents.map((a) => `<option value="${esc(a.id)}">${esc(a.label)}</option>`).join('');
+  els.select.value = S.chat ? S.chat.agent : S.agent;
+}
+function renderNotice(message) {
+  const agent = currentAgent();
+  const text = message || (agent && !agent.ready ? agent.reason : '');
+  els.notice.hidden = !text;
+  els.notice.textContent = text || '';
+}
+async function refreshAgents() {
+  try {
+    const me = await api('GET', '/ask/api/me');
+    S.agents = me.agents || [];
+    if (!agentById(S.agent) && S.agents.length) S.agent = S.agents[0].id;
+    renderPicker();
+    renderNotice();
+    renderComposer();
+    if (!S.chat && !S.exchanges.length) renderThread();
+  } catch (e) {
+    renderNotice(e.message);
+  }
+}
+
+// ── recents ──────────────────────────────────────────────────────────────────
+async function loadRecents() {
+  try {
+    S.chats = (await api('GET', '/ask/api/chats')).chats || [];
+  } catch (e) {
+    renderNotice(e.message);
+  }
+  renderRecents();
+}
+function upsertRecent(chat) {
+  S.chats = [chat, ...S.chats.filter((c) => c.id !== chat.id)];
+  renderRecents();
+}
+function renderRecents() {
+  if (!S.chats.length) {
+    els.recents.innerHTML = '<li class="empty-recents">Your chats will appear here.</li>';
+    return;
+  }
+  const multi = S.agents.length > 1;
+  els.recents.innerHTML = S.chats.map((c) => {
+    const active = S.chat && S.chat.id === c.id;
+    const running = c.running || (active && S.busy);
+    const agent = agentById(c.agent);
+    const title = S.renaming === c.id
+      ? `<input class="rename-input" id="rename-input" value="${esc(c.title)}" maxlength="80" aria-label="Chat name">`
+      : `<span class="recent-title">${esc(c.title)}</span>`;
+    return `<li class="recent${active ? ' active' : ''}" data-id="${esc(c.id)}">
+      ${S.renaming === c.id ? `<div class="recent-open">${title}</div>` : `<button class="recent-open" data-action="open" data-id="${esc(c.id)}">${title}
+        <span class="recent-sub">${running ? '<span class="live-dot" aria-hidden="true"></span>Answering · ' : ''}${multi && agent ? esc(agent.label) + ' · ' : ''}${esc(ago(c.updated_at))}</span></button>`}
+      ${active && S.renaming !== c.id ? `<div class="recent-actions"><button class="link-btn" data-action="rename">Rename</button><button class="link-btn danger" data-action="delete">Delete</button></div>` : ''}
+    </li>`;
+  }).join('');
+  const input = $('rename-input');
+  if (input) { input.focus(); input.select(); }
+}
+async function finishRename(save) {
+  const input = $('rename-input');
+  const id = S.renaming;
+  if (!id) return;
+  const title = input ? input.value.trim() : '';
+  S.renaming = null;
+  if (save && title) {
+    try {
+      const res = await api('PATCH', `/ask/api/chats/${id}`, { title });
+      S.chats = S.chats.map((c) => (c.id === id ? { ...c, title: res.chat.title } : c));
+      if (S.chat && S.chat.id === id) S.chat.title = res.chat.title;
+    } catch (e) { renderNotice(e.message); }
+  }
+  renderRecents();
+}
+async function deleteChat(id) {
+  const chat = S.chats.find((c) => c.id === id);
+  if (!confirm(`Delete "${chat ? chat.title : 'this chat'}"? This can't be undone.`)) return;
+  try {
+    await api('DELETE', `/ask/api/chats/${id}`);
+  } catch (e) { renderNotice(e.message); return; }
+  S.chats = S.chats.filter((c) => c.id !== id);
+  if (S.chat && S.chat.id === id) newChat(); else renderRecents();
+}
+
+// ── opening chats ────────────────────────────────────────────────────────────
+function setUrl(id) {
+  const url = id ? `/ask?c=${encodeURIComponent(id)}` : '/ask';
+  if (location.pathname + location.search !== url) { try { history.replaceState(null, '', url); } catch (e) {} }
+  if (id) store.set('mercury.lastChat', id); else store.del('mercury.lastChat');
+}
+function resetRun() {
+  S.run = null; S.live = null; S.busy = false;
+  if (S.ticker) { clearInterval(S.ticker); S.ticker = null; }
+}
+function newChat() {
+  resetRun();
+  S.chat = null; S.exchanges = [];
+  setUrl(null);
+  els.files.hidden = true;
+  renderPicker(); renderRecents(); renderNotice(); renderThread(); renderComposer();
+  closeSide();
+  els.input.focus();
+}
+async function openChat(id) {
+  resetRun();
+  closeSide();
+  let data;
+  try {
+    data = await api('GET', `/ask/api/chats/${id}`);
+  } catch (e) {
+    if (e.status === 404) { S.chats = S.chats.filter((c) => c.id !== id); newChat(); renderNotice('That chat no longer exists.'); return; }
+    renderNotice(e.message); return;
+  }
+  S.chat = data.chat;
+  S.exchanges = (data.exchanges || []).map((x) => ({ ...x, status: (x.stats && x.stats.status) || 'completed', buffer: '' }));
+  setUrl(S.chat.id);
+  renderPicker(); renderRecents(); renderNotice(data.history_error || ''); renderThread(true);
+  loadFiles();
+  if (data.run && data.run.active) {
+    S.busy = true;
+    S.run = { chatId: S.chat.id, key: data.run.key, after: 0 };
+    renderComposer();
+    poll();
+  } else {
+    renderComposer();
+  }
+}
+
+// ── sending and following a turn ─────────────────────────────────────────────
+async function send(text) {
+  text = (text || '').trim();
+  const agent = currentAgent();
+  if (!text || S.busy) return;
+  if (!agent || !agent.ready) { renderNotice(agent ? agent.reason : 'No assistant is available to you.'); return; }
+  S.busy = true;
+  const ex = { turn: null, user: text, steps: [], answer: '', buffer: '', status: 'running', started: Date.now() };
+  S.live = ex;
+  S.exchanges.push(ex);
+  els.input.value = '';
+  autosize();
+  renderThread(true); renderComposer(); renderNotice();
+  try {
+    let res;
+    if (!S.chat) {
+      res = await api('POST', '/ask/api/chats', { agent: S.agent, message: text });
+      S.chat = res.chat;
+      setUrl(S.chat.id);
+    } else {
+      res = await api('POST', `/ask/api/chats/${S.chat.id}/messages`, { message: text });
+    }
+    upsertRecent({ ...res.chat, running: true, updated_at: Date.now() / 1000 });
+    S.run = { chatId: S.chat.id, key: res.run.key, after: 0 };
+    poll();
+  } catch (e) {
+    ex.status = 'failed'; ex.error = e.message;
+    S.busy = false; S.live = null;
+    renderThread(); renderComposer();
+  }
+}
+async function poll() {
+  const run = S.run;
+  if (!run || run.polling) return;  // each turn has at most one poller; it ends when S.run moves on
+  run.polling = true;
+  startTicker();
+  try {
+    while (S.run === run) {
+      let data;
+      try {
+        data = await api('GET', `/ask/api/chats/${run.chatId}/events?after=${run.after}&wait=25&key=${encodeURIComponent(run.key || '')}`);
+      } catch (e) {
+        if (S.run !== run) break;
+        if (e.status === 404) { resetRun(); renderComposer(); break; }
+        await sleep(2500);
+        continue;
+      }
+      if (S.run !== run) break;
+      if (!data.active) {  // the turn ended long ago, or Mercury restarted: show what Hermes kept
+        await openChat(run.chatId);
+        break;
+      }
+      if (run.key && data.key !== run.key && S.live) {  // a newer turn started elsewhere
+        S.exchanges = S.exchanges.filter((x) => x !== S.live);
+        S.live = null;
+      }
+      run.key = data.key;
+      for (const ev of data.events) { applyEvent(ev); run.after = ev.seq; }
+      renderLive();
+      if (data.done) { finishRun(); break; }
+    }
+  } finally {
+    run.polling = false;
+  }
+}
+function flushNote(ex) {
+  if (ex.buffer.trim()) ex.steps.push({ kind: 'note', text: ex.buffer });
+  ex.buffer = '';
+}
+function applyEvent(ev) {
+  if (ev.type === 'turn.started') {
+    if (!S.live) {
+      S.live = { turn: ev.turn, user: ev.text, steps: [], answer: '', buffer: '', status: 'running', started: Date.now() };
+      S.exchanges.push(S.live);
+      renderThread(true);
+    }
+    return;
+  }
+  const ex = S.live;
+  if (!ex) return;
+  switch (ev.type) {
+    case 'assistant.delta': ex.buffer += ev.delta || ''; break;
+    case 'assistant.commentary':
+      if (ev.already_streamed) flushNote(ex);
+      else if ((ev.text || '').trim()) ex.steps.push({ kind: 'note', text: ev.text });
+      break;
+    case 'tool.started':
+      flushNote(ex);
+      ex.steps.push({ kind: 'code', tool: ev.tool, code: ev.code, status: 'running', output: null });
+      break;
+    case 'tool.completed': case 'tool.failed': {
+      const step = [...ex.steps].reverse().find((s) => s.kind === 'code' && s.status === 'running');
+      if (step) step.status = ev.type === 'tool.failed' ? 'error' : 'done';
+      break;
+    }
+    case 'assistant.completed': ex.answer = ev.content || ex.buffer; ex.buffer = ''; break;
+    case 'error': ex.error = ev.message; break;
+    case 'turn.finished':
+      ex.status = ev.status;
+      ex.turn = ev.turn;
+      ex.stats = ev.turn ? { model: ev.model, steps: ev.steps, duration_ms: ev.duration_ms, cost_usd: ev.cost_usd, status: ev.status } : null;
+      if (!ex.answer && ex.buffer.trim() && ev.status === 'completed') ex.answer = ex.buffer;
+      else if (ex.buffer.trim()) flushNote(ex);
+      ex.buffer = '';
+      ex.steps.forEach((s) => { if (s.status === 'running') s.status = ev.status === 'cancelled' ? 'stopped' : 'done'; });
+      if (ev.status === 'failed' && !ex.error) ex.error = ev.error || 'Something went wrong.';
+      break;
+    default: break;
+  }
+}
+function finishRun() {
+  const chatId = S.run ? S.run.chatId : null;
+  resetRun();
+  renderThread(); renderComposer();
+  S.chats = S.chats.map((c) => (c.id === chatId ? { ...c, running: false, updated_at: Date.now() / 1000 } : c));
+  renderRecents();
+  if (S.chat && S.chat.id === chatId) loadFiles();
+}
+async function stopRun() {
+  if (!S.chat || !S.busy) return;
+  if (S.live) { S.live.stopping = true; renderLive(); }
+  try { await api('POST', `/ask/api/chats/${S.chat.id}/stop`, {}); } catch (e) { renderNotice(e.message); }
+}
+function startTicker() {
+  if (S.ticker) return;
+  S.ticker = setInterval(() => {
+    if (!S.live) return;
+    if (clusterHint(S.live) && !document.querySelector('.hint')) { renderLive(); return; }
+    const el = document.querySelector('[data-elapsed]');
+    if (el) el.textContent = fmtDuration(Date.now() - S.live.started);
+  }, 1000);
+}
+function clusterHint(ex) {  // step 1 waiting a long time is almost always the cluster starting
+  const codeSteps = ex.steps.filter((s) => s.kind === 'code');
+  return codeSteps.length === 1 && codeSteps[0].status === 'running' && Date.now() - ex.started > 20000;
+}
+
+// ── rendering the thread ─────────────────────────────────────────────────────
+const THUMB_UP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11v9H4v-9h3zm0 0l4-8a2 2 0 012 2v4h5.5a2 2 0 012 2.3l-1.2 7A2 2 0 0117.3 20H7"/></svg>';
+const THUMB_DOWN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 13V4h3v9h-3zm0 0l-4 8a2 2 0 01-2-2v-4H5.5a2 2 0 01-2-2.3l1.2-7A2 2 0 016.7 4H17"/></svg>';
+const FILE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>';
+
+function stepHtml(step, n) {
+  if (step.kind === 'note') return `<li class="step note">${md(step.text)}</li>`;
+  const state = { running: 'Running…', done: 'Done', error: 'Error', stopped: 'Stopped' }[step.status] || '';
+  const output = step.output
+    ? `<details class="out"><summary>Output</summary><pre class="code"><code>${esc(step.output)}</code></pre></details>` : '';
+  return `<li class="step ${esc(step.status)}"><div class="step-head"><span class="step-dot" aria-hidden="true"></span>Step ${n}
+    <span class="step-state">· ${state}</span></div><pre class="code"><code>${esc(step.code || '(no code)')}</code></pre>${output}</li>`;
+}
+function exchangeHtml(ex, index) {
+  const live = ex === S.live;
+  const codeSteps = ex.steps.filter((s) => s.kind === 'code').length;
+  let n = 0;
+  const open = ex.stepsOpen != null ? ex.stepsOpen : live;
+  const steps = ex.steps.length
+    ? `<details class="steps" data-index="${index}"${open ? ' open' : ''}><summary>Python code executed
+        <span class="steps-count">${codeSteps} step${codeSteps === 1 ? '' : 's'}</span></summary>
+        <ol class="step-list">${ex.steps.map((s) => stepHtml(s, s.kind === 'code' ? ++n : n)).join('')}</ol></details>` : '';
+  let body = '';
+  const text = ex.answer || (live ? ex.buffer : '');
+  if (text) body += `<div class="answer">${md(text)}${live && !ex.answer ? '<span class="cursor" aria-hidden="true"></span>' : ''}</div>`;
+  if (live && !ex.answer) {
+    const running = ex.steps.some((s) => s.kind === 'code' && s.status === 'running');
+    const label = ex.stopping ? 'Stopping…' : running ? `Running step ${codeSteps} on Databricks…` : text ? 'Writing…' : 'Working…';
+    body += `<div class="working"><span class="spinner" aria-hidden="true"></span><span>${label}</span>
+      <span data-elapsed>${fmtDuration(Date.now() - ex.started)}</span></div>`;
+    if (clusterHint(ex)) {
+      body += '<div class="hint">The first question of the day can take a few minutes while the Databricks cluster starts.</div>';
+    }
+  }
+  if (ex.status === 'cancelled') body += '<div class="stopped-note">Stopped.</div>';
+  if (ex.error && ex.status !== 'cancelled') body += `<div class="err-box">${esc(ex.error)}</div>`;
+  let meta = '';
+  if (!live && ex.stats) {
+    const st = ex.stats;
+    const parts = [shortModel(st.model), `${st.steps || 0} step${st.steps === 1 ? '' : 's'}`, fmtDuration(st.duration_ms || 0), fmtCost(st.cost_usd)].filter(Boolean);
+    const rateable = ex.turn && ex.status === 'completed';
+    meta = `<div class="meta"><span class="meta-text">${esc(parts.join(' · '))}</span>${rateable ? `
+      <button class="rate" data-action="rate" data-turn="${ex.turn}" data-rating="up" aria-label="Good answer" aria-pressed="${ex.rating === 'up'}">${THUMB_UP}</button>
+      <button class="rate" data-action="rate" data-turn="${ex.turn}" data-rating="down" aria-label="Wrong answer" aria-pressed="${ex.rating === 'down'}">${THUMB_DOWN}</button>` : ''}</div>`;
+  }
+  return `<section class="ex" data-index="${index}"><div class="user"><div class="user-bubble">${esc(ex.user)}</div></div>
+    <div class="bot">${steps}${body}${meta}</div></section>`;
+}
+function welcomeHtml() {
+  const agent = currentAgent();
+  const samples = agent && agent.ready ? agent.samples || [] : [];
+  const name = BOOT.name ? `, ${esc(BOOT.name)}` : '';
+  return `<div class="welcome"><p class="eyebrow">${esc(agent ? agent.label : 'Mercury')}</p>
+    <h1>What do you want to know${name}?</h1>
+    <p>${esc(agent ? agent.description : 'No assistant is available to you yet.')}</p>
+    ${samples.length ? `<div class="samples">${samples.map((q) => `<button class="sample" data-action="sample">${esc(q)}</button>`).join('')}</div>` : ''}</div>`;
+}
+function nearBottom() {
+  const t = els.thread;
+  return t.scrollHeight - t.scrollTop - t.clientHeight < 120;
+}
+function scrollToEnd() { els.thread.scrollTop = els.thread.scrollHeight; }
+function renderThread(forceScroll) {
+  const stick = forceScroll || nearBottom();
+  els.inner.innerHTML = (!S.chat && !S.exchanges.length) ? welcomeHtml() : S.exchanges.map(exchangeHtml).join('');
+  if (stick) scrollToEnd();
+}
+function renderLive() {
+  if (!S.live) return;
+  const index = S.exchanges.indexOf(S.live);
+  const node = els.inner.querySelector(`section.ex[data-index="${index}"]`);
+  if (!node) { renderThread(); return; }
+  const stick = nearBottom();
+  node.outerHTML = exchangeHtml(S.live, index);
+  if (stick) scrollToEnd();
+}
+function renderComposer() {
+  const agent = currentAgent();
+  const ready = !!(agent && agent.ready);
+  els.stop.hidden = !S.busy;
+  els.send.hidden = S.busy;
+  els.send.disabled = !ready || !els.input.value.trim();
+  els.input.disabled = !ready;
+  els.input.placeholder = !ready ? 'The assistant is not available right now.'
+    : S.busy ? 'Answering…'
+      : (agent.id === 'optimizer' ? 'Ask about a notebook or table…' : 'Ask about the voter file…');
+}
+function autosize() {
+  els.input.style.height = 'auto';
+  els.input.style.height = Math.min(els.input.scrollHeight, 200) + 'px';
+}
+
+// ── files ────────────────────────────────────────────────────────────────────
+async function loadFiles() {
+  const chat = S.chat;
+  if (!chat) { els.files.hidden = true; return; }
+  let data;
+  try { data = await api('GET', `/ask/api/chats/${chat.id}/files`); } catch (e) { return; }
+  if (!S.chat || S.chat.id !== chat.id) return;
+  const files = data.files || [];
+  els.files.hidden = !files.length;
+  els.files.innerHTML = files.length ? '<span class="files-title">Files from this chat</span>' + files.map((f) =>
+    `<a class="file" href="/ask/api/chats/${encodeURIComponent(chat.id)}/files/${encodeURIComponent(f.name)}" download="${esc(f.name)}">${FILE_ICON}${esc(f.name)}<small>${esc(fmtSize(f.size))}</small></a>`).join('') : '';
+}
+
+// ── feedback ─────────────────────────────────────────────────────────────────
+async function rate(turn, rating) {
+  const ex = S.exchanges.find((x) => x.turn === turn);
+  if (!ex || !S.chat) return;
+  const next = ex.rating === rating ? 'cleared' : rating;
+  const before = ex.rating;
+  ex.rating = next === 'cleared' ? null : next;
+  renderThread();
+  try {
+    await api('POST', `/ask/api/chats/${S.chat.id}/feedback`, { turn, rating: next, snippet: (ex.answer || '').slice(0, 500) });
+  } catch (e) {
+    ex.rating = before; renderThread(); renderNotice(e.message);
+  }
+}
+
+// ── sidebar on small screens ─────────────────────────────────────────────────
+function closeSide() { document.body.classList.remove('side-open'); $('menu-btn').setAttribute('aria-expanded', 'false'); }
+
+// ── events ───────────────────────────────────────────────────────────────────
+els.composer.addEventListener('submit', (e) => { e.preventDefault(); send(els.input.value); });
+els.input.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); if (!S.busy) send(els.input.value); }
+});
+els.input.addEventListener('input', () => { autosize(); renderComposer(); });
+els.stop.addEventListener('click', stopRun);
+$('new-chat').addEventListener('click', newChat);
+els.select.addEventListener('change', () => { S.agent = els.select.value; newChat(); });
+els.recents.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const action = btn.dataset.action;
+  if (action === 'open') { if (!S.chat || S.chat.id !== btn.dataset.id) openChat(btn.dataset.id); else closeSide(); }
+  else if (action === 'rename' && S.chat) { S.renaming = S.chat.id; renderRecents(); }
+  else if (action === 'delete' && S.chat) deleteChat(S.chat.id);
+});
+els.recents.addEventListener('keydown', (e) => {
+  if (e.target.id !== 'rename-input') return;
+  if (e.key === 'Enter') { e.preventDefault(); finishRename(true); }
+  if (e.key === 'Escape') { e.preventDefault(); finishRename(false); }
+});
+els.recents.addEventListener('focusout', (e) => { if (e.target.id === 'rename-input') finishRename(true); });
+els.inner.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  if (btn.dataset.action === 'sample') { els.input.value = btn.textContent; autosize(); renderComposer(); els.input.focus(); }
+  if (btn.dataset.action === 'rate') rate(+btn.dataset.turn, btn.dataset.rating);
+});
+els.inner.addEventListener('toggle', (e) => {
+  const d = e.target;
+  if (d.classList && d.classList.contains('steps')) {
+    const ex = S.exchanges[+d.dataset.index];
+    if (ex) ex.stepsOpen = d.open;
+  }
+}, true);
+$('help-btn').addEventListener('click', () => els.help.showModal());
+$('help-close').addEventListener('click', () => els.help.close());
+els.help.addEventListener('click', (e) => { if (e.target === els.help) els.help.close(); });
+$('theme-btn').addEventListener('click', () => {
+  const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  store.set('mercury.theme', next);
+});
+$('menu-btn').addEventListener('click', () => {
+  const open = !document.body.classList.contains('side-open');
+  document.body.classList.toggle('side-open', open);
+  $('menu-btn').setAttribute('aria-expanded', String(open));
+});
+$('scrim').addEventListener('click', closeSide);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && S.run && !S.run.polling) poll();
+});
+
+// ── start ────────────────────────────────────────────────────────────────────
+(async function init() {
+  renderComposer();
+  await refreshAgents();
+  await loadRecents();
+  const wanted = new URLSearchParams(location.search).get('c') || store.get('mercury.lastChat');
+  if (wanted && S.chats.some((c) => c.id === wanted)) await openChat(wanted);
+  else newChat();
+  setInterval(() => { if (S.agents.some((a) => !a.ready)) refreshAgents(); }, 30000);
+})();
+})();
+</script>
+</body>
+</html>
