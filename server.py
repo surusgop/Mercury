@@ -970,7 +970,11 @@ def build_hermes_env() -> dict[str, str]:
         # The default profile's API server is the one loopback listener the
         # multiplexing gateway serves /p/<profile>/ on (see provision_surus_agents).
         env.update({"API_SERVER_ENABLED": "true", "API_SERVER_KEY": hermes_api_server_key(),
-                    "API_SERVER_HOST": HERMES_API_SERVER_HOST, "API_SERVER_PORT": str(HERMES_API_SERVER_PORT)})
+                    "API_SERVER_HOST": HERMES_API_SERVER_HOST, "API_SERVER_PORT": str(HERMES_API_SERVER_PORT),
+                    # The /ask chat reaches the agents at /p/<profile>/, which only a
+                    # multiplexing gateway serves. Multiplexing is Hermes' default, but
+                    # an unset flag can resolve to standalone at boot; pin it.
+                    "GATEWAY_MULTIPLEX_PROFILES": "true"})
     for key in IMAGE_EXECUTION_ENV_KEYS:
         if key in os.environ:
             env[key] = os.environ[key]
@@ -2237,66 +2241,183 @@ async def login_redirect(request: Request) -> Response:
     return RedirectResponse(f"/setup/login?returnTo={_url_quote(rt)}", status_code=302)
 
 
-ASK_PAGE_HTML = """<!DOCTYPE html>
-<html lang="en"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Mercury · Surus Enterprises</title>
-<link rel="icon" type="image/png" href="/setup/brand/surus-icon.png">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Montserrat:wght@700;800&display=swap" rel="stylesheet">
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:#F5F7F9;color:#232932;font:400 15px/1.55 'IBM Plex Sans','Helvetica Neue',Arial,sans-serif;
-  -webkit-font-smoothing:antialiased;min-height:100vh;display:flex;flex-direction:column}
-header{height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;background:#0F1216;color:#fff}
-.lockup{display:inline-flex;align-items:center;gap:12px;color:#fff;text-decoration:none}
-.lockup img{height:30px;width:auto;display:block}
-.wm{display:grid;gap:1px;line-height:1}
-.wm span:first-child{font:900 16.2px/1 Montserrat,Arial,sans-serif;letter-spacing:.02em;text-transform:uppercase}
-.wm span:last-child{font:700 6.5px/1 Montserrat,Arial,sans-serif;letter-spacing:.89px;text-transform:uppercase;opacity:.85}
-.who{display:flex;align-items:center;gap:16px;font:500 12px/1 'IBM Plex Sans',sans-serif;color:#C3CAD3}
-.who a{color:#fff;text-decoration:none;font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:11px}
-main{flex:1;display:flex;align-items:center;justify-content:center;padding:24px 16px}
-.card{background:#fff;border:1px solid #DFE4E9;border-top:3px solid #C3262F;border-radius:8px;
-  box-shadow:0 1px 2px rgba(15,18,22,.06),0 1px 1px rgba(15,18,22,.04);padding:32px;max-width:520px;width:100%}
-.eyebrow{font:700 11px/1.35 'IBM Plex Sans',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#6B7684}
-h1{font:800 26px/1.15 Montserrat,'Helvetica Neue',Arial,sans-serif;letter-spacing:-.01em;color:#0F1216;margin:6px 0 12px}
-p{color:#333B46;margin-bottom:12px}
-.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
-.btn{display:inline-flex;align-items:center;height:36px;padding:0 18px;border-radius:6px;text-decoration:none;
-  font:600 12px/1 'IBM Plex Sans',sans-serif;letter-spacing:.06em;text-transform:uppercase;border:1px solid #C3CAD3;color:#232932;background:#fff}
-.btn:hover{background:#F5F7F9;border-color:#98A2AF}
-.btn.primary{background:#C3262F;border-color:#A81F27;color:#fff}
-.btn.primary:hover{background:#A81F27}
-</style></head>
-<body>
-<header>
-  <a class="lockup" href="/ask"><img src="/setup/brand/surus-icon-white.png" alt=""><span class="wm"><span>Surus</span><span>Enterprises</span></span></a>
-  <div class="who"><span>__EMAIL__</span><a href="/logout">Sign out</a></div>
-</header>
-<main><section class="card">
-  <p class="eyebrow">Mercury</p>
-  <h1>Hi __NAME__.</h1>
-  <p>You're signed in. The Mercury chat for voter-file questions is being set up and will appear on this page.</p>
-  __ADMIN__
-</section></main>
-</body></html>"""
+# ── Mercury chat (/ask) ───────────────────────────────────────────────────────
+# Staff chat with the Surus agents; see mercury_chat.py. Every signed-in user
+# gets the staff agent, admins also get the optimizer, and each chat belongs to
+# the person who started it.
+_APP_DIR = str(Path(__file__).resolve().parent)
+if _APP_DIR not in sys.path:
+    sys.path.insert(0, _APP_DIR)  # mercury_chat.py and hermes_plugins/ sit next to server.py
+
+from mercury_chat import AskAPI, AskDeps, ChatStore, HermesAgentAPI, RunManager  # noqa: E402
+
+ASK_PAGE_FILE = Path(__file__).parent / "templates" / "ask.html"
+ASK_PASSWORD_ADMIN_EMAIL = "admin"  # the emergency username/password login has no email
+ASK_AGENTS = {
+    "staff": {
+        "label": "Surus Intelligence",
+        "description": "Voter files and ballot history for Illinois, Wisconsin and Michigan.",
+        "admin_only": False,
+        # The old chatbot's example questions.
+        "samples": [
+            "How many Republican voters are in DuPage County, IL?",
+            "What is the breakdown of Democrat Base vs Republican Base voters in Cook County?",
+            "How many voters in Schaumburg Township are marked as Unreliable Conservative?",
+            "Show me the top 10 zip codes in Illinois by number of registered voters.",
+            "What percentage of voters in Illinois have voted in the last 3 general elections?",
+        ],
+    },
+    "optimizer": {
+        "label": "Notebook optimizer",
+        "description": "For the tech team: review Databricks notebooks and tables and make them faster.",
+        "admin_only": True,
+        "samples": [
+            "Review the notebook at /Workspace/... and list the slowest steps.",
+            "Which of our largest Delta tables need OPTIMIZE or ANALYZE?",
+            "Add optimization tracking cells to the notebook at /Workspace/...",
+        ],
+    },
+}
+
+
+def ask_identity(request) -> dict | None:
+    """The person using /ask: a Google user, or an admin signed in with the
+    emergency username/password login."""
+    user = google_user(request)
+    email = str((user or {}).get("email") or "").strip().lower()
+    if email:
+        return {"email": email, "name": user.get("first_name") or user.get("name") or "",
+                "admin": user.get("role") == "admin"}
+    if _verify_auth_token(request.cookies.get(COOKIE_NAME, "")):
+        return {"email": ASK_PASSWORD_ADMIN_EMAIL, "name": "Admin", "admin": True}
+    return None
+
+
+def ask_agent_ready(name: str) -> tuple[bool, str]:
+    if not surus_agents_status.get("enabled"):
+        return False, "The assistants are off until an admin sets up Databricks."
+    state = (surus_agents_status.get("agents") or {}).get(name) or {}
+    if not state.get("ready"):
+        if state.get("error"):
+            return False, "This assistant could not be set up. An admin can see why in Setup."
+        return False, "This assistant is still being set up. Try again in a minute."
+    if str(state.get("openrouter_key") or "").startswith("none"):
+        return False, "No OpenRouter key is set yet. An admin can add one in Setup."
+    if gw.state != "running":
+        if gw.state == "starting":
+            return False, "Hermes is starting. Try again in a minute."
+        return False, "Hermes is not running. An admin can start it in Setup."
+    return True, ""
+
+
+def ask_agents_for(user: dict) -> list[dict]:
+    agents = []
+    for name, info in ASK_AGENTS.items():
+        if info["admin_only"] and not user.get("admin"):
+            continue
+        ready, reason = ask_agent_ready(name)
+        agents.append({"id": name, "label": info["label"], "description": info["description"],
+                       "samples": info["samples"], "ready": ready, "reason": reason})
+    return agents
+
+
+def _ask_databricks():
+    from hermes_plugins.surus_databricks import DEFAULT_VOLUME
+    from hermes_plugins.surus_databricks.dbx import DatabricksClient
+    env = {**os.environ, **read_env(ENV_FILE)}
+    volume = (env.get("SURUS_VOLUME") or "").strip() or DEFAULT_VOLUME
+    return DatabricksClient.from_env(env), volume.rstrip("/")
+
+
+def _ask_export_entries(session_ids: list[str]) -> list[dict]:
+    """Files the agent exported for a chat: {volume}/chats/<session>/exports/."""
+    from hermes_plugins.surus_databricks.executor import safe_chat_id
+    client, volume = _ask_databricks()
+    if client is None:
+        return []
+    try:
+        found: dict[str, dict] = {}
+        for session_id in session_ids:
+            for entry in client.list_directory(f"{volume}/chats/{safe_chat_id(session_id)}/exports"):
+                path = str(entry.get("path") or "")
+                name = str(entry.get("name") or path.rsplit("/", 1)[-1])
+                if entry.get("is_directory") or not path or not name:
+                    continue
+                found[name] = {"name": name, "path": path, "size": entry.get("file_size"),
+                               "modified": entry.get("last_modified")}
+        return sorted(found.values(), key=lambda f: f.get("modified") or 0, reverse=True)
+    finally:
+        client.close()
+
+
+async def ask_list_files(session_ids: list[str]) -> list[dict]:
+    return await asyncio.to_thread(_ask_export_entries, session_ids)
+
+
+async def ask_open_file(session_ids: list[str], name: str):
+    """A streaming download of one of the chat's exports, or None. Only names
+    in the chat's own listing are served, so a name can never reach another path."""
+    entry = next((f for f in await ask_list_files(session_ids) if f["name"] == name), None)
+    if entry is None:
+        return None
+
+    def prepare():
+        client, _ = _ask_databricks()
+        try:
+            return client.file_url(entry["path"])
+        finally:
+            client.close()
+
+    url, headers = await asyncio.to_thread(prepare)
+    http = get_http_client()
+    resp = await http.send(http.build_request("GET", url, headers=headers,
+                                              timeout=httpx.Timeout(300.0, connect=10.0)),
+                           stream=True, follow_redirects=True)
+    if resp.status_code != 200:
+        await resp.aclose()
+        raise RuntimeError(f"Databricks answered HTTP {resp.status_code}")
+    return resp, entry["name"]
+
+
+def ask_feedback_sink(agent: str, row: dict) -> None:
+    """Thumbs up/down → the agent's usage-log inbox; the Surus Databricks plugin
+    writes it to <prefix>_feedback with the other usage rows."""
+    env = {**os.environ, **read_env(ENV_FILE)}
+    if str(env.get("CHAT_LOGGING", "true")).strip().lower() in ("false", "0", "no", "off"):
+        return
+    from hermes_plugins.surus_databricks.chatlog import drop_in_inbox
+    drop_in_inbox(MERCURY_DIR / "log-inbox" / agent, "feedback", row)
+
+
+ask_store = ChatStore(MERCURY_DIR / "chats.sqlite3")
+ask_hermes = HermesAgentAPI(f"http://{HERMES_API_SERVER_HOST}:{HERMES_API_SERVER_PORT}",
+                            surus_agent_api_key, lambda: get_http_client())
+ask_runs = RunManager(ask_store, ask_hermes, model_for=lambda _agent: surus_agent_model())
+ASK = AskAPI(AskDeps(identity=ask_identity, agents=ask_agents_for, store=ask_store, runs=ask_runs,
+                     api=ask_hermes, list_files=ask_list_files, open_file=ask_open_file,
+                     feedback_sink=ask_feedback_sink))
+
+
+def _script_json(value) -> str:
+    """JSON that is safe inside a <script> element."""
+    return (json.dumps(value).replace("<", "\\u003c").replace(">", "\\u003e")
+            .replace("&", "\\u0026").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029"))
 
 
 async def page_ask(request: Request) -> Response:
-    """GET /ask — the staff home page (the Mercury chat lands here in a later PR)."""
-    user = google_user(request)
-    admin = _is_authenticated(request)
-    if user is None and not admin:
+    """GET /ask — the Mercury chat (staff land here after signing in)."""
+    user = ask_identity(request)
+    if user is None:
         return guard(request)
-    email = (user or {}).get("email") or "Admin"
-    name = (user or {}).get("first_name") or (user or {}).get("name") or "there"
-    admin_html = ('<div class="actions"><a class="btn primary" href="/setup">Open Setup</a>'
-                  '<a class="btn" href="/?force=1">Open Hermes dashboard</a></div>' if admin else "")
-    html = (ASK_PAGE_HTML
-            .replace("__EMAIL__", _html_escape(email))
-            .replace("__NAME__", _html_escape(name))
-            .replace("__ADMIN__", admin_html))
-    return HTMLResponse(html)
+    shown = "Admin (password login)" if user["email"] == ASK_PASSWORD_ADMIN_EMAIL else user["email"]
+    admin_links = ('<a class="top-link" href="/setup">Open Setup</a>'
+                   '<a class="top-link" href="/?force=1">Hermes dashboard</a>' if user["admin"] else "")
+    html = (ASK_PAGE_FILE.read_text(encoding="utf-8")
+            .replace("__BOOT_JSON__", _script_json({"email": user["email"], "name": user["name"],
+                                                    "admin": user["admin"]}))
+            .replace("__EMAIL__", _html_escape(shown))
+            .replace("__ADMIN_LINKS__", admin_links))
+    return HTMLResponse(html, headers={"Cache-Control": "no-store"})
 
 
 async def logout(request: Request) -> Response:
@@ -5705,6 +5826,7 @@ routes = [
     # /setup/login must precede the /setup/{path:path} catch-all further down.
     Route("/setup/brand/{name}",                route_brand_asset,   methods=["GET", "HEAD"]),
     Route("/ask",                               page_ask,            methods=["GET"]),
+    *ASK.routes(),
     Route("/setup/login",                       page_login,          methods=["GET"]),
     Route("/setup/login",                       login_post,          methods=["POST"]),
     Route("/setup",                             page_index),
